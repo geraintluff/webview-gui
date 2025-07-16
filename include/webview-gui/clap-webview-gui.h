@@ -55,12 +55,11 @@ struct ClapWebviewGui {
 	}
 	
 	bool isOpen() const {
-		if (hostWebview1) return hostWebview1->is_open(host);
-		return webviewActive;
+		if (guiActive) return guiVisible; // if the GUI was created (native or webview) then we can use show/hide
+		return true; // we don't know, assume true
 	}
 	
 	bool send(const unsigned char *bytes, size_t length) {
-		if (!webviewActive) return false;
 		if (nativeWebview) {
 			nativeWebview->send(bytes, length);
 			return true;
@@ -71,7 +70,7 @@ struct ClapWebviewGui {
 	}
 	
 private:
-	bool webviewActive = false, webviewVisible = false;
+	bool guiActive = false, guiVisible = false;
 	// if it's active but has no native implentation, then we're using the CLAP webview stuff directly
 	std::unique_ptr<WebviewGui> nativeWebview;
 
@@ -131,7 +130,7 @@ private:
 
 		if (is_floating) return false;
 		if (!std::strcmp(api, CLAP_WINDOW_API_WEBVIEW)) {
-			self.webviewActive = true;
+			self.guiActive = true;
 			return true;
 		}
 		
@@ -181,7 +180,7 @@ private:
 					self.pluginWebview1->receive(self.plugin, (const void *)bytes, uint32_t(length));
 				}
 			};
-			self.webviewActive = true;
+			self.guiActive = true;
 			return true;
 		}
 		return false;
@@ -190,8 +189,8 @@ private:
 	static void gui_destroy(const clap_plugin *plugin) {
 		auto &self = getSelf(plugin);
 		self.nativeWebview = nullptr;
-		self.webviewActive = false;
-		self.webviewVisible = false;
+		self.guiActive = false;
+		self.guiVisible = false;
 	}
 	
 	static bool gui_set_scale(const clap_plugin *plugin, double scale) {
@@ -248,14 +247,14 @@ private:
 	
 	static bool gui_show(const clap_plugin *plugin) {
 		auto &self = getSelf(plugin);
-		self.webviewVisible = true;
+		self.guiVisible = true;
 		if (self.nativeWebview) self.nativeWebview->setVisible(true);
 		return true;
 	}
 	
 	static bool gui_hide(const clap_plugin *plugin) {
 		auto &self = getSelf(plugin);
-		self.webviewVisible = false;
+		self.guiVisible = false;
 		if (self.nativeWebview) self.nativeWebview->setVisible(false);
 		return true;
 	}
