@@ -1,6 +1,8 @@
 #pragma once
 
 #include <functional>
+#include <vector>
+#include <string>
 
 struct WebviewGui {
 	enum class Platform {
