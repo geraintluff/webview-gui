@@ -14,14 +14,6 @@ struct WebviewGui {
 	struct Resource {
 		std::string mediaType;
 		std::vector<unsigned char> bytes;
-		
-		void set(const char *str, size_t length, const std::string &type="text/html;charset=UTF-8") {
-			bytes.assign((const unsigned char *)str, (const unsigned char *)str + std::strlen(str));
-			mediaType = type;
-		}
-		void set(const std::string &str, const std::string &type="text/html;charset=UTF-8") {
-			set(str.c_str(), str.size(), type);
-		}
 	};
 	using ResourceGetter = std::function<bool(const char *path, Resource &resource)>;
 	
