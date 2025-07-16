@@ -1,15 +1,37 @@
 #include "../include/webview-gui/webview-gui.h"
 
-#include "./choc/gui/choc_WebView.h"
-#include "./choc/memory/choc_Base64.h"
+#include "./choc/platform/choc_Platform.h"
+#if !CHOC_APPLE && !CHOC_WINDOWS && !CHOC_LINUX
+// No native webview - do absolutely nothing
+struct WebviewGui::Impl {};
+bool WebviewGui::supports(Platform p) {
+	return false;
+}
+WebviewGui * WebviewGui::create(Platform platform, const std::string &startPath, ResourceGetter getter) {
+	return nullptr;
+}
+WebviewGui * WebviewGui::create(Platform platform, const std::string &startPath, const std::string &baseDir) {
+	return nullptr;
+}
 
-#include <unordered_map>
-#include <fstream>
-#include <iostream>
-#define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
+// None of these should ever be called, because no instances can ever be created
+WebviewGui::WebviewGui(WebviewGui::Impl *) {}
+WebviewGui::~WebviewGui() {}
+void WebviewGui::attach(void *platformNative) {}
+void WebviewGui::send(const unsigned char *, size_t) {}
+void WebviewGui::setSize(double width, double height) {}
+void WebviewGui::setVisible(bool visible) {}
+#else
+#	include "./choc/gui/choc_WebView.h"
+#	include "./choc/memory/choc_Base64.h"
 
-#if CHOC_APPLE
-#	include <CoreFoundation/CFBundle.h>
+#	include <unordered_map>
+#	include <fstream>
+#	include <iostream>
+#	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
+
+#	if CHOC_APPLE
+#		include <CoreFoundation/CFBundle.h>
 struct WebviewGui::Impl {
 	Impl(const choc::ui::WebView::Options &options) : main(main), webview(options) {}
 	
@@ -35,7 +57,7 @@ struct WebviewGui::Impl {
 	WebviewGui *main;
 	choc::ui::WebView webview;
 };
-#else
+#	else
 struct WebviewGui::Impl {
 	Impl(const choc::ui::WebView::Options &options) : main(main), webview(options) {}
 	
@@ -50,7 +72,7 @@ struct WebviewGui::Impl {
 	WebviewGui *main;
 	choc::ui::WebView webview;
 };
-#endif
+#	endif
 
 static std::string guessMediaType(const char *path);
 
@@ -60,12 +82,12 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 	choc::ui::WebView::Options options;
 	options.acceptsFirstMouseClick = true;
 	options.transparentBackground = true;
-#if CHOC_WINDOWS
+#	if CHOC_WINDOWS
 	// Copied from CHOC - not sure why, maybe ensuring a secure context?
 	options.customSchemeURI = "https://choc.localhost/";
-#else
+#	else
 	options.customSchemeURI = "choc://choc.choc/";
-#endif
+#	endif
 	auto startUri = options.customSchemeURI + startPath;
    	options.fetchResource = [getter](const std::string &path) {
 		using ChocResource = choc::ui::WebView::Options::Resource;
@@ -108,11 +130,11 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &startPath, const std::string &baseDir) {
 	return create(p, startPath, [baseDir](const char *path, Resource &resource){
 		auto fullPath = baseDir + path;
-#if CHOC_WINDOWS
+#	if CHOC_WINDOWS
 		for (size_t i = baseDir.size(); i < fullPath.size(); ++i) {
 			if (fullPath[i] == '/') fullPath[i] = '\\';
 		}
-#endif
+#	endif
 		std::ifstream fileStream{fullPath, std::ios::binary | std::ios::ate};
 		if (!fileStream) return false;
 		size_t length = fileStream.tellg();
@@ -602,3 +624,4 @@ static std::string guessMediaType(const char *path) {
 		return std::string(pair.first) + "/" + pair.second;
 	}
 }
+#endif
