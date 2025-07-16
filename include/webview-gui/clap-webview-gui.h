@@ -23,7 +23,7 @@ struct ClapWebviewGui {
 		hostWebview1 = (const clap_host_webview1 *)host->get_extension(host, CLAP_EXT_WEBVIEW1);
 	}
 
-#if CHOC_WINDOWS
+#ifdef WIN32
 	static constexpr char pathSep = '\\';
 #else
 	static constexpr char pathSep = '/';
