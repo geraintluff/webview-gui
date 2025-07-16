@@ -4,6 +4,8 @@
 #include "webview-gui.h"
 
 #include <memory>
+#include <string>
+#include <cctype>
 
 template<void *(pluginToThis)(const clap_plugin *)>
 struct ClapWebviewGui {
@@ -11,7 +13,7 @@ struct ClapWebviewGui {
 	uint32_t minWidth = 200, minHeight = 200;
 	clap_gui_resize_hints resizeHints{true, true, false, 0, 0}; // Horizontal and vertical, no fixed aspect ratio
 
-	ClapWebviewGui(const clap_plugin *plugin, const clap_host *host) : plugin(plugin), host(host) {}
+	ClapWebviewGui(const clap_plugin *plugin, const clap_host *host, std::string resourcePath="") : plugin(plugin), host(host), resourcePath(resourcePath) {}
 	
 	// Call from `plugin.init()`
 	void init() {
@@ -20,6 +22,12 @@ struct ClapWebviewGui {
 		pluginWebview1 = (const clap_plugin_webview1 *)plugin->get_extension(plugin, CLAP_EXT_WEBVIEW1);
 		hostWebview1 = (const clap_host_webview1 *)host->get_extension(host, CLAP_EXT_WEBVIEW1);
 	}
+
+#if CHOC_WINDOWS
+	static constexpr char pathSep = '\\';
+#else
+	static constexpr char pathSep = '/';
+#endif
 
 	// Call from `plugin.get_extension()`
 	const void * getExtension(const char *extId) {
@@ -117,6 +125,7 @@ private:
 		return true;
 	}
 	
+	std::string resourcePath;
 	static bool gui_create(const clap_plugin *plugin, const char *api, bool is_floating) {
 		auto &self = getSelf(plugin);
 
@@ -131,9 +140,47 @@ private:
 		if (!std::strcmp(api, CLAP_WINDOW_API_COCOA)) platform = WebviewGui::COCOA;
 		if (!std::strcmp(api, CLAP_WINDOW_API_X11)) platform = WebviewGui::X11;
 
-		auto *ptr = WebviewGui::create(platform, self.getStartUrl(), self.width, self.height);
+		std::string startUrl = self.getStartUrl();
+		bool isAbsolute = true; // look for `scheme:`
+		for (size_t i = 0; i < startUrl.size(); ++i) {
+			if (std::isalnum(startUrl[i])) continue;
+			if (i > 0 && startUrl[i] == ':') break;
+			isAbsolute = false;
+			break;
+		}
+		std::string baseDir = self.resourcePath;
+		if (startUrl.substr(0, 5) == "file:") {
+			// strip `file:` and all leading `/`s
+			size_t pos = 5;
+			while (startUrl[pos] == '/') ++pos;
+			startUrl = startUrl.substr(pos);
+			baseDir = startUrl;
+			
+			while (!baseDir.empty() && baseDir.back() != '/') {
+				baseDir.pop_back();
+			}
+			if (!baseDir.empty()) baseDir.pop_back();
+			startUrl = startUrl.substr(baseDir.size());
+#if CHOC_WINDOWS
+			for (auto &c : baseDir) {
+				if (c == '/') c = '\\';
+			}
+#else
+			baseDir = "/" + baseDir;
+#endif
+		}
+		if (startUrl[0] != '/') {
+			startUrl = "/" + startUrl;
+		}
+		auto *ptr = WebviewGui::create(platform, startUrl.c_str(), baseDir);
 		if (ptr) {
 			self.nativeWebview = std::unique_ptr<WebviewGui>{ptr};
+			self.nativeWebview->receive = [plugin](const unsigned char *bytes, size_t length){
+				auto &self = getSelf(plugin);
+				if (self.pluginWebview1) {
+					self.pluginWebview1->receive(self.plugin, (const void *)bytes, uint32_t(length));
+				}
+			};
 			self.webviewActive = true;
 			return true;
 		}
