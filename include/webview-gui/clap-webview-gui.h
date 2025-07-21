@@ -21,6 +21,12 @@ struct ClapWebviewGui {
 
 		pluginWebview1 = (const clap_plugin_webview1 *)plugin->get_extension(plugin, CLAP_EXT_WEBVIEW1);
 		hostWebview1 = (const clap_host_webview1 *)host->get_extension(host, CLAP_EXT_WEBVIEW1);
+		pluginWebview2 = (const clap_plugin_webview2 *)plugin->get_extension(plugin, CLAP_EXT_WEBVIEW2);
+		hostWebview2 = (const clap_host_webview2 *)host->get_extension(host, CLAP_EXT_WEBVIEW2);
+
+		// If we've fetched our own compatibility functions, remove them
+		if (pluginWebview1 == getExtension(CLAP_EXT_WEBVIEW1)) pluginWebview1 = nullptr;
+		if (pluginWebview2 == getExtension(CLAP_EXT_WEBVIEW2)) pluginWebview2 = nullptr;
 	}
 
 #ifdef WIN32
@@ -50,6 +56,22 @@ struct ClapWebviewGui {
 				gui_hide
 			};
 			return &ext;
+		} else if (!std::strcmp(extId, CLAP_EXT_WEBVIEW1)) {
+			if (pluginWebview2) {
+				static const clap_plugin_webview1 ext{
+					webview2to1_provide_starting_uri,
+					pluginWebview2->receive /* compatible */
+				};
+				return &ext;
+			}
+		} else if (!std::strcmp(extId, CLAP_EXT_WEBVIEW2)) {
+			if (pluginWebview1) {
+				static const clap_plugin_webview2 ext{
+					webview1to2_get_uri,
+					pluginWebview1->receive /* compatible */
+				};
+				return &ext;
+			}
 		}
 		return nullptr;
 	}
@@ -65,6 +87,8 @@ struct ClapWebviewGui {
 			return true;
 		} else if (hostWebview1) {
 			return hostWebview1->send(host, bytes, (uint32_t)length);
+		} else if (hostWebview2) {
+			return hostWebview2->send(host, bytes, (uint32_t)length);
 		}
 		return false;
 	}
@@ -85,25 +109,44 @@ private:
 		bool(CLAP_ABI *is_open)(const clap_host_t *host);
 		bool(CLAP_ABI *send)(const clap_host_t *host, const void *buffer, uint32_t size);
 	};
+	static constexpr const char *CLAP_EXT_WEBVIEW2 = "clap.webview/2";
+	struct clap_plugin_webview2 {
+		int32_t (CLAP_ABI *get_uri)(const clap_plugin_t *plugin, char *uri, uint32_t uri_capacity);
+		bool(CLAP_ABI *receive)(const clap_plugin_t *plugin, const void *buffer, uint32_t size);
+	};
+	struct clap_host_webview2 {
+		bool(CLAP_ABI *send)(const clap_host_t *host, const void *buffer, uint32_t size);
+	};
+
 	const clap_plugin *plugin;
 	const clap_host *host;
 
 	const clap_host_gui *hostGui = nullptr;
 	const clap_plugin_webview1 *pluginWebview1 = nullptr;
 	const clap_host_webview1 *hostWebview1 = nullptr;
+	const clap_plugin_webview2 *pluginWebview2 = nullptr;
+	const clap_host_webview2 *hostWebview2 = nullptr;
 
 	static ClapWebviewGui & getSelf(const clap_plugin *plugin) {
 		return *(ClapWebviewGui *)pluginToThis(plugin);
 	}
 	
 	char startUrlBuffer[2048] = {0};
-	const char * getStartUrl() {
-		if (pluginWebview1) {
-			if (pluginWebview1->provide_starting_uri(plugin, startUrlBuffer, 2048)) {
-				return startUrlBuffer;
+	const char * getNativeStartUrl() {
+		if (pluginWebview2) {
+			auto uriLength = pluginWebview2->get_uri(plugin, startUrlBuffer, 2048);
+			if (uriLength > 2048) {
+				std::strcpy(startUrlBuffer, "data:text/html,URI%20too%20long");
+			} else if (uriLength <= 0) {
+				std::strcpy(startUrlBuffer, "data:text/html,get_uri%20error");
 			}
+		} else if (pluginWebview1) {
+			if (!pluginWebview1->provide_starting_uri(plugin, startUrlBuffer, 2048)) {
+				std::strcpy(startUrlBuffer, "data:text/html,provide_starting_uri%20false");
+			}
+		} else {
+			std::strcpy(startUrlBuffer, "data:text/html,no%20plugin%20webview%2ext%20");
 		}
-		std::strcpy(startUrlBuffer, "data:text/html,page%20not%20loaded");
 		return startUrlBuffer;
 	}
 
@@ -139,7 +182,7 @@ private:
 		if (!std::strcmp(api, CLAP_WINDOW_API_COCOA)) platform = WebviewGui::COCOA;
 		if (!std::strcmp(api, CLAP_WINDOW_API_X11)) platform = WebviewGui::X11;
 
-		std::string startUrl = self.getStartUrl();
+		std::string startUrl = self.getNativeStartUrl();
 		bool isAbsolute = true; // look for `scheme:`
 		for (size_t i = 0; i < startUrl.size(); ++i) {
 			if (std::isalnum(startUrl[i])) continue;
@@ -176,7 +219,9 @@ private:
 			self.nativeWebview = std::unique_ptr<WebviewGui>{ptr};
 			self.nativeWebview->receive = [plugin](const unsigned char *bytes, size_t length){
 				auto &self = getSelf(plugin);
-				if (self.pluginWebview1) {
+				if (self.pluginWebview2) {
+					self.pluginWebview2->receive(self.plugin, (const void *)bytes, uint32_t(length));
+				} else if (self.pluginWebview1) {
 					self.pluginWebview1->receive(self.plugin, (const void *)bytes, uint32_t(length));
 				}
 			};
@@ -257,5 +302,22 @@ private:
 		self.guiVisible = false;
 		if (self.nativeWebview) self.nativeWebview->setVisible(false);
 		return true;
+	}
+
+	static bool webview2to1_provide_starting_uri(const clap_plugin_t *plugin, char *startingUri, uint32_t capacity) {
+		auto &self = getSelf(plugin);
+		auto uriLength = self.pluginWebview2->get_uri(plugin, startingUri, capacity);
+		return (uriLength > 0) && (uriLength <= capacity);
+	}
+
+	static int32_t webview1to2_get_uri(const clap_plugin_t *plugin, char *startingUri, uint32_t capacity) {
+		auto &self = getSelf(plugin);
+		if (!self.pluginWebview1->provide_starting_uri(plugin, startingUri, capacity)) {
+			return -1; // no way to report truncation
+		}
+		for (uint32_t i = 0; i < capacity; ++i) {
+			if (startingUri[i] == 0) return i;
+		}
+		return capacity;
 	}
 };
