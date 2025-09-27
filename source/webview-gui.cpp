@@ -105,7 +105,36 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 		return chocResource;
 	};
 	options.webviewIsReady = [startUri](choc::ui::WebView &wv){
-		wv.addInitScript("window.addEventListener('message',e=>{if(e.source==window){_WebviewGui_receive64(btoa(String.fromCharCode(...new Uint8Array(e.data))));e.stopImmediatePropagation();}},{capture:true});function _WebviewGui_send64(a){let b=atob(a),B=new Uint8Array(b.length);for(let i=0;i<B.length;++i)B[i]=b.charCodeAt(i);window.dispatchEvent(new MessageEvent('message',{data:B.buffer}));}");
+		wv.addInitScript(R"jsCode(
+			if (!Uint8Array.prototype.toBase64) {
+				Uint8Array.prototype.toBase64 = function() {
+					let binaryString = "";
+					for (var i = 0; i < this.length; i++) {
+						binaryString += String.fromCharCode(this[i]);
+					}
+					return btoa(binaryString);
+				};
+			}
+			if (!Uint8Array.fromBas64) {
+				Uint8Array.fromBase64 = b64 => {
+					let binaryString = atob(b64);
+					let array = new Uint8Array(b64.length);
+					for (let i=0; i < array.length; ++i) {
+						array[i] = binaryString.charCodeAt(i);
+					}
+					return array;
+				};
+			}
+			window.addEventListener('message', e=>{
+				if (e.source == window) {
+					e.stopImmediatePropagation();
+					_WebviewGui_receive64(new Uint8Array(e.data).toBase64());
+				}
+			}, {capture: true});
+			function _WebviewGui_send64(b64){
+				window.dispatchEvent(new MessageEvent('message', {data: Uint8Array.fromBase64(b64).buffer}));
+			}
+		)jsCode");
 		wv.navigate(startUri);
 	};
 
