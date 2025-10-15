@@ -115,7 +115,7 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 					return btoa(binaryString);
 				};
 			}
-			if (!Uint8Array.fromBas64) {
+			if (!Uint8Array.fromBase64) {
 				Uint8Array.fromBase64 = b64 => {
 					let binaryString = atob(b64);
 					let array = new Uint8Array(b64.length);
