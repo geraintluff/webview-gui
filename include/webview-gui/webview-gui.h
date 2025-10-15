@@ -19,22 +19,30 @@ struct WebviewGui {
 	};
 	using ResourceGetter = std::function<bool(const char *path, Resource &resource)>;
 	
-	static bool supports(Platform p);
-	static WebviewGui * create(Platform platform, const std::string &startPath, ResourceGetter getter);
-	static WebviewGui * create(Platform platform, const std::string &startPath, const std::string &baseDir);
+	inline static bool supports(Platform p);
+	inline static WebviewGui * create(Platform platform, const std::string &startPath, ResourceGetter getter);
+	inline static WebviewGui * create(Platform platform, const std::string &startPath, const std::string &baseDir);
 	WebviewGui(const WebviewGui &other) = delete;
-	~WebviewGui();
+	inline ~WebviewGui();
 	
-	void attach(void *platformNative);
+	inline void attach(void *platformNative);
 
 	// Assign this to receive messages
 	std::function<void(const unsigned char *, size_t)> receive;
-	void send(const unsigned char *, size_t);
+	inline void send(const unsigned char *, size_t);
 	
-	void setSize(double width, double height);
-	void setVisible(bool visible);
+	inline void setSize(double width, double height);
+	inline void setVisible(bool visible);
 private:
 	struct Impl;
 	Impl *impl;
-	WebviewGui(Impl *);
+	inline WebviewGui(Impl *);
 };
+
+#if defined(__has_include) && __has_include("choc/gui/choc_WebView.h")
+#	include "./_platform/choc.h"
+#elif __APPLE__ && TARGET_OS_MAC
+#	include "./_platform/apple-osx.h"
+#else
+#	include "./_platform/not-supported.h"
+#endif

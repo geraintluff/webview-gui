@@ -1,29 +1,9 @@
-#include "../include/webview-gui/webview-gui.h"
-
-#include "./choc/platform/choc_Platform.h"
+#include "choc/platform/choc_Platform.h"
 #if !CHOC_APPLE && !CHOC_WINDOWS && !CHOC_LINUX
-// No native webview - do absolutely nothing
-struct WebviewGui::Impl {};
-bool WebviewGui::supports(Platform p) {
-	return false;
-}
-WebviewGui * WebviewGui::create(Platform platform, const std::string &startPath, ResourceGetter getter) {
-	return nullptr;
-}
-WebviewGui * WebviewGui::create(Platform platform, const std::string &startPath, const std::string &baseDir) {
-	return nullptr;
-}
-
-// None of these should ever be called, because no instances can ever be created
-WebviewGui::WebviewGui(WebviewGui::Impl *) {}
-WebviewGui::~WebviewGui() {}
-void WebviewGui::attach(void *platformNative) {}
-void WebviewGui::send(const unsigned char *, size_t) {}
-void WebviewGui::setSize(double width, double height) {}
-void WebviewGui::setVisible(bool visible) {}
+#	include "./not-supported.h"
 #else
-#	include "./choc/gui/choc_WebView.h"
-#	include "./choc/memory/choc_Base64.h"
+#	include "choc/gui/choc_WebView.h"
+#	include "choc/memory/choc_Base64.h"
 
 #	include <unordered_map>
 #	include <fstream>
