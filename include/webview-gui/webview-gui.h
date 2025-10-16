@@ -4,6 +4,14 @@
 #include <vector>
 #include <string>
 
+namespace webview_gui {
+
+#ifdef WEBVIEW_GUI_HEADER_ONLY
+#	define WEBVIEW_GUI_IMPL inline
+#else
+#	define WEBVIEW_GUI_IMPL
+#endif
+
 struct WebviewGui {
 	enum class Platform {
 		NONE, HWND, COCOA, X11
@@ -19,30 +27,32 @@ struct WebviewGui {
 	};
 	using ResourceGetter = std::function<bool(const char *path, Resource &resource)>;
 	
-	inline static bool supports(Platform p);
-	inline static WebviewGui * create(Platform platform, const std::string &startPath, ResourceGetter getter);
-	inline static WebviewGui * create(Platform platform, const std::string &startPath, const std::string &baseDir);
+	WEBVIEW_GUI_IMPL static bool supports(Platform p);
+	WEBVIEW_GUI_IMPL static WebviewGui * create(Platform platform, const std::string &startPath, ResourceGetter getter);
+	WEBVIEW_GUI_IMPL static WebviewGui * create(Platform platform, const std::string &startPath, const std::string &baseDir);
 	WebviewGui(const WebviewGui &other) = delete;
-	inline ~WebviewGui();
+	WEBVIEW_GUI_IMPL ~WebviewGui();
 	
-	inline void attach(void *platformNative);
+	WEBVIEW_GUI_IMPL void attach(void *platformNative);
 
 	// Assign this to receive messages
 	std::function<void(const unsigned char *, size_t)> receive;
-	inline void send(const unsigned char *, size_t);
+	WEBVIEW_GUI_IMPL void send(const unsigned char *, size_t);
 	
-	inline void setSize(double width, double height);
-	inline void setVisible(bool visible);
+	WEBVIEW_GUI_IMPL void setSize(double width, double height);
+	WEBVIEW_GUI_IMPL void setVisible(bool visible);
 private:
 	struct Impl;
 	Impl *impl;
-	inline WebviewGui(Impl *);
+	WEBVIEW_GUI_IMPL WebviewGui(Impl *);
 };
 
-#if defined(__has_include) && __has_include("choc/gui/choc_WebView.h")
-#	include "./_platform/choc.h"
-#elif __APPLE__ && TARGET_OS_MAC
-#	include "./_platform/apple-osx.h"
-#else
-#	include "./_platform/not-supported.h"
+#undef WEBVIEW_GUI_IMPL
+
+} // namespace
+
+using WebviewGui = ::webview_gui::WebviewGui;
+
+#ifdef WEBVIEW_GUI_HEADER_ONLY
+#	include "./_impl/webview-gui.hxx"
 #endif

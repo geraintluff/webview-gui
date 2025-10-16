@@ -1,4 +1,5 @@
 #include "choc/platform/choc_Platform.h"
+
 #if !CHOC_APPLE && !CHOC_WINDOWS && !CHOC_LINUX
 #	include "./not-supported.h"
 #else
@@ -10,8 +11,13 @@
 #	include <iostream>
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
+namespace webview_gui {
+
 #	if CHOC_APPLE
+} // close namespace
 #		include <CoreFoundation/CFBundle.h>
+namespace webview_gui {
+
 struct WebviewGui::Impl {
 	Impl(const choc::ui::WebView::Options &options) : main(main), webview(options) {}
 	
@@ -634,3 +640,5 @@ static std::string guessMediaType(const char *path) {
 	}
 }
 #endif
+
+} // namespace

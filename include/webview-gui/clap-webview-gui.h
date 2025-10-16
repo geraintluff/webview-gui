@@ -203,7 +203,7 @@ private:
 			}
 			if (!baseDir.empty()) baseDir.pop_back();
 			startUrl = startUrl.substr(baseDir.size());
-#if CHOC_WINDOWS
+#if defined (_WIN32) || defined (_WIN64)
 			for (auto &c : baseDir) {
 				if (c == '/') c = '\\';
 			}
@@ -263,6 +263,17 @@ private:
 		auto &self = getSelf(plugin);
 		if (*w < self.minWidth) *w = self.minWidth;
 		if (*h < self.minHeight) *h = self.minHeight;
+		// Adjust based on the resizing hints
+		auto &resizeHints = self.resizeHints;
+		if (resizeHints.preserve_aspect_ratio) {
+			auto area = double(*w)*(*h);
+			auto refArea = double(resizeHints.aspect_ratio_width)*resizeHints.aspect_ratio_height;
+			double scale = std::sqrt(area/refArea);
+			*w = std::round(scale*resizeHints.aspect_ratio_width);
+			*h = std::round(scale*resizeHints.aspect_ratio_height);
+		}
+		if (!resizeHints.can_resize_horizontally) *w = self.width;
+		if (!resizeHints.can_resize_vertically) *h = self.height;
 		return true;
 	}
 	

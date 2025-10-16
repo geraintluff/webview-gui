@@ -1,5 +1,7 @@
 #pragma once
 
+namespace webview_gui {
+
 // No native webview - do absolutely nothing
 struct WebviewGui::Impl {};
 bool WebviewGui::supports(Platform p) {
@@ -20,3 +22,4 @@ void WebviewGui::send(const unsigned char *, size_t) {}
 void WebviewGui::setSize(double width, double height) {}
 void WebviewGui::setVisible(bool visible) {}
 
+} // namespace
