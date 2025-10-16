@@ -84,18 +84,35 @@ WebviewGui * WebviewGui::create(Platform platform, const std::string &startPath,
 	callSimple(impl->webview, "loadHTMLString:baseURL:", nsString("custom ResourceGetter not implemented yet"), baseUrl);
 	return new WebviewGui(impl);
 }
-WebviewGui * WebviewGui::create(Platform platform, const std::string &startPath, const std::string &baseDir) {
+WebviewGui * WebviewGui::create(Platform platform, const std::string &startUrl) {
+	using namespace _objc;
+	id url = callSimple("NSURL", "URLWithString:", nsString(startUrl.c_str()));
+	if (!url) return nullptr;
+
+	auto *impl = new Impl();
+	auto *request = _objc::callSimple("NSMutableURLRequest", "requestWithURL:", url);
+LOG_EXPR(/*absolute startUrl*/request);
+LOG_EXPR(callSimple(callSimple(url, "absoluteString"), "UTF8String"));
+	callSimple(impl->webview, "loadRequest:", request);
+	return new WebviewGui(impl);
+}
+WebviewGui * WebviewGui::create(Platform platform, const std::string &startPathOrUrl, const std::string &baseDir) {
+	if (!baseDir.size()) return create(platform, startPathOrUrl);
+	
 	using namespace _objc;
 	id baseUrl = callSimple("NSURL", "fileURLWithPath:isDirectory:", nsString(baseDir.c_str()), nsNumber(true));
-	auto *startPathC = startPath.c_str();
-	if (startPathC[0] == '/') ++startPathC; // skip any leading `/`, since we have a base directory
-	id url = callSimple("NSURL", "URLWithString:relativeToURL:", nsString(startPathC), baseUrl);
+	if (!baseUrl) return nullptr;
+	
+	auto *startUrlC = startPathOrUrl.c_str();
+	if (startUrlC[0] == '/') ++startUrlC; // skip any leading `/`, since we have a base directory
+	id url = callSimple("NSURL", "URLWithString:relativeToURL:", nsString(startUrlC), baseUrl);
+	if (!url) return nullptr;
+	
 	auto *impl = new Impl();
-	if (callSimple<bool>(url, "fileUrl")) {
+	if (callSimple<bool>(url, "isFileURL")) {
 		callSimple(impl->webview, "loadFileURL:allowingReadAccessToURL:", url, baseUrl);
 	} else {
 		auto *request = _objc::callSimple("NSMutableURLRequest", "requestWithURL:", url);
-LOG_EXPR(request);
 		callSimple(impl->webview, "loadRequest:", request);
 	}
 	return new WebviewGui(impl);

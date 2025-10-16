@@ -142,8 +142,17 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 
 	return new WebviewGui(impl);
 }
+
+WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &startUrl) {
+	return create(p, startUrl, [baseDir](const char *path, Resource &resource){
+		// No custom resources - the start URL needs to be absolute
+		return false;
+	});
+}
+
 WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &startPath, const std::string &baseDir) {
 	return create(p, startPath, [baseDir](const char *path, Resource &resource){
+		// Read resources from disk
 		auto fullPath = baseDir + path;
 #	if CHOC_WINDOWS
 		for (size_t i = baseDir.size(); i < fullPath.size(); ++i) {

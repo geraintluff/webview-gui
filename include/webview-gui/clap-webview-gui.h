@@ -7,15 +7,24 @@
 #include <string>
 #include <cctype>
 
+namespace webview_gui {
+
 template<void *(pluginToThis)(const clap_plugin *)>
 struct ClapWebviewGui {
 	uint32_t width = 350, height = 200;
 	uint32_t minWidth = 200, minHeight = 200;
 	clap_gui_resize_hints resizeHints{true, true, false, 0, 0}; // Horizontal and vertical, no fixed aspect ratio
 
-	ClapWebviewGui(const clap_plugin *plugin, const clap_host *host, std::string resourcePath="") : plugin(plugin), host(host), resourcePath(resourcePath) {}
+	ClapWebviewGui(const clap_plugin *plugin=nullptr, const clap_host *host=nullptr, std::string resourcePath="") : plugin(plugin), host(host), resourcePath(std::move(resourcePath)) {}
 	
 	// Call from `plugin.init()`
+	void init(const clap_plugin *initPlugin, const clap_host *initHost, const std::string &initResourcePath="") {
+		plugin = initPlugin;
+		host = initHost;
+		if (initResourcePath.size()) resourcePath = initResourcePath;
+
+		init();
+	}
 	void init() {
 		hostGui = (const clap_host_gui *)host->get_extension(host, CLAP_EXT_GUI);
 
@@ -118,8 +127,9 @@ private:
 		bool(CLAP_ABI *send)(const clap_host_t *host, const void *buffer, uint32_t size);
 	};
 
-	const clap_plugin *plugin;
-	const clap_host *host;
+	const clap_plugin *plugin = nullptr;
+	const clap_host *host = nullptr;
+	std::string resourcePath;
 
 	const clap_host_gui *hostGui = nullptr;
 	const clap_plugin_webview1 *pluginWebview1 = nullptr;
@@ -149,16 +159,19 @@ private:
 		}
 		return startUrlBuffer;
 	}
+	
+	static WebviewGui::Platform clapApiToPlatform(const char *api) {
+		auto platform = WebviewGui::NONE;
+		if (!std::strcmp(api, CLAP_WINDOW_API_WIN32)) platform = WebviewGui::HWND;
+		if (!std::strcmp(api, CLAP_WINDOW_API_COCOA)) platform = WebviewGui::COCOA;
+		if (!std::strcmp(api, CLAP_WINDOW_API_X11)) platform = WebviewGui::X11EMBED;
+		return platform;
+	}
 
 	static bool gui_is_api_supported(const clap_plugin *plugin, const char *api, bool is_floating) {
 		if (is_floating) return false;
 		if (!std::strcmp(api, CLAP_WINDOW_API_WEBVIEW)) return true;
-
-		auto platform = WebviewGui::NONE;
-		if (!std::strcmp(api, CLAP_WINDOW_API_WIN32)) platform = WebviewGui::HWND;
-		if (!std::strcmp(api, CLAP_WINDOW_API_COCOA)) platform = WebviewGui::COCOA;
-		if (!std::strcmp(api, CLAP_WINDOW_API_X11)) platform = WebviewGui::X11;
-		return WebviewGui::supports(platform);
+		return WebviewGui::supports(clapApiToPlatform(api));
 	}
 	
 	static bool gui_get_preferred_api(const clap_plugin *plugin, const char **api, bool *is_floating) {
@@ -167,7 +180,6 @@ private:
 		return true;
 	}
 	
-	std::string resourcePath;
 	static bool gui_create(const clap_plugin *plugin, const char *api, bool is_floating) {
 		auto &self = getSelf(plugin);
 
@@ -177,11 +189,6 @@ private:
 			return true;
 		}
 		
-		auto platform = WebviewGui::NONE;
-		if (!std::strcmp(api, CLAP_WINDOW_API_WIN32)) platform = WebviewGui::HWND;
-		if (!std::strcmp(api, CLAP_WINDOW_API_COCOA)) platform = WebviewGui::COCOA;
-		if (!std::strcmp(api, CLAP_WINDOW_API_X11)) platform = WebviewGui::X11;
-
 		std::string startUrl = self.getNativeStartUrl();
 		bool isAbsolute = true; // look for `scheme:`
 		for (size_t i = 0; i < startUrl.size(); ++i) {
@@ -191,7 +198,7 @@ private:
 			break;
 		}
 		std::string baseDir = self.resourcePath;
-		if (startUrl.substr(0, 5) == "file:") {
+		if (startUrl.substr(0, 5) == "file:") { // absolute file path
 			// strip `file:` and all leading `/`s
 			size_t pos = 5;
 			while (startUrl[pos] == '/') ++pos;
@@ -214,6 +221,7 @@ private:
 		if (startUrl[0] != '/') {
 			startUrl = "/" + startUrl;
 		}
+		auto platform = clapApiToPlatform(api);
 		auto *ptr = WebviewGui::create(platform, startUrl.c_str(), baseDir);
 		if (ptr) {
 			self.nativeWebview = std::unique_ptr<WebviewGui>{ptr};
@@ -332,3 +340,5 @@ private:
 		return capacity;
 	}
 };
+
+} // namespace
