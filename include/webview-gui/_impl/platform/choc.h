@@ -1,3 +1,5 @@
+#include "../helpers.h"
+
 #include "choc/platform/choc_Platform.h"
 
 #if !CHOC_APPLE && !CHOC_WINDOWS && !CHOC_LINUX
@@ -142,7 +144,7 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 }
 
 WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &startUrl) {
-	return create(p, startUrl, [baseDir](const char *path, Resource &resource){
+	return create(p, startUrl, [](const char *path, Resource &resource){
 		// No custom resources - the start URL needs to be absolute
 		return false;
 	});
