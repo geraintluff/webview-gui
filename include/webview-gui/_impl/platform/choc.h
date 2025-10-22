@@ -193,6 +193,6 @@ void WebviewGui::setVisible(bool visible) {}
 
 //-------------
 
-#endif
-
 } // namespace
+
+#endif
