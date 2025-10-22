@@ -38,7 +38,6 @@ void decodeBase64(const char *base64, std::vector<unsigned char> &binary) {
 		// Bottom 2 bits of v2, all 6 bits of v3
 		binary.push_back(((v2&0x03)<<6)|v3);
 	}
-	return binary;
 }
 std::vector<unsigned char> decodeBase64(const char *base64) {
 	std::vector<unsigned char> binary;
