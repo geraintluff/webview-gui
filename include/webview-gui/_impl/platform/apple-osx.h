@@ -3,6 +3,7 @@
 #include "../helpers.h"
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <CoreGraphics/CGGeometry.h>
 #include <objc/runtime.h>
 #include <objc/message.h>
 
@@ -16,7 +17,9 @@ namespace _objc {
 	Return callSimple(id obj, const char *method, Args... args) {
 		// We have to cast `objc_msgSend` to a version with the arguments/return types
 		auto fn = (Return(*)(id, SEL, Args...))(objc_msgSend);
-		return fn(obj, sel_registerName(method), args...);
+		auto selector = sel_registerName(method);
+		if (!class_respondsToSelector(object_getClass(obj), selector)) return Return();
+		return fn(obj, selector, args...);
 	}
 
 	template<typename Return=id, class... Args>
