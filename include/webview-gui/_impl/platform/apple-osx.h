@@ -48,12 +48,8 @@ namespace _objc {
 struct WebviewGui::Impl {
 	WebviewGui *main = nullptr;
 	id webview = nullptr;
-	id messageHandler = nullptr;
+	id messageHandler = nullptr, schemeHandler = nullptr;
 	ResourceGetter getter;
-
-	Impl(ResourceGetter g) : Impl() {
-		getter = std::move(g);
-	}
 
 	static constexpr const char * associatedObjectKey = "WebviewGui::Impl";
 
@@ -87,7 +83,70 @@ struct WebviewGui::Impl {
 		return (id)objc_getClass(className);
 	}
 
-	Impl() {
+	static void schemeHandlerStartImpl(id self, SEL, id /*webview*/, id urlSchemeTask) {
+		using namespace _objc;
+		auto *impl = (Impl *)objc_getAssociatedObject(self, associatedObjectKey);
+		if (!impl || !impl->main) return;
+		id request = callSimple(urlSchemeTask, "request");
+		id url = callSimple(request, "URL");
+		id path = callSimple(url, "path");
+		auto *pathStr = callSimple<const char *>(path, "UTF8String");
+		Resource resource;
+		resource.mediaType = _helpers::guessMediaType(pathStr);
+		if (!impl->getter(pathStr, resource)) {
+			id response = callSimple("NSHTTPURLResponse", "alloc");
+			response = callSimple(
+				response,
+				"initWithURL:statusCode:HTTPVersion:headerFields:",
+				url,
+				long(404),
+				nsString("HTTP/1.1"),
+				nil
+			);
+			callSimple(urlSchemeTask, "didReceiveResponse:", response);
+			callSimple(urlSchemeTask, "didFinish");
+			return;
+		}
+
+		id headerNames[] = {nsString("Content-Length"), nsString("Content-Type"), nsString("Cache-Control"), nsString("Access-Control-Allow-Origin")};
+		auto lengthStr = std::to_string(resource.bytes.size());
+		id headerValues[] = {nsString(lengthStr.c_str()), nsString(resource.mediaType.c_str()), nsString("no-store"), nsString("*")};
+		id headers = callSimple("NSDictionary", "dictionaryWithObjects:forKeys:count:", headerValues, headerNames, (unsigned long)4);
+
+		id response = callSimple("NSHTTPURLResponse", "alloc");
+		response = callSimple(
+			response,
+			"initWithURL:statusCode:HTTPVersion:headerFields:",
+			url,
+			long(200),
+			nsString("HTTP/1.1"),
+			headers
+		);
+		callSimple(urlSchemeTask, "didReceiveResponse:", response);
+		id data = callSimple("NSData", "dataWithBytes:length:", (const void *)resource.bytes.data(), (unsigned long)resource.bytes.size());
+		callSimple(urlSchemeTask, "didReceiveData:", data);
+		callSimple(urlSchemeTask, "didFinish");
+	}
+	static void schemeHandlerStopImpl(id self, SEL, id /*webview*/, id urlSchemeTask) {
+	}
+	static id createSchemeHandlerClass() {
+		using namespace _objc;
+		static constexpr const char *className = "WebviewGUI_WKURLSchemeHandler";
+		id alreadyRegistered = (id)objc_getClass(className);
+		if (alreadyRegistered) return alreadyRegistered;
+		
+		auto handlerClass = objc_allocateClassPair(objc_getClass("NSObject"), className, 0);
+		class_addProtocol(handlerClass, objc_getProtocol("WKURLSchemeHandler"));
+		class_addMethod(handlerClass, sel_registerName("webView:startURLSchemeTask:"), (IMP)schemeHandlerStartImpl, "v@:@@");
+		class_addMethod(handlerClass, sel_registerName("webView:stopURLSchemeTask:"), (IMP)schemeHandlerStopImpl, "v@:@@");
+		objc_registerClassPair(handlerClass);
+		
+		return (id)objc_getClass(className);
+	}
+
+	Impl(ResourceGetter g={}) {
+		getter = std::move(g);
+
 		using namespace _objc;
 		static id messageHandlerClass = createMessageHandlerClass();
 		
@@ -95,6 +154,13 @@ struct WebviewGui::Impl {
 		if (!config) return;
 		// Wait until everything's ready until showing anything
 		callVoid(config, "setSuppressesIncrementalRendering:", nsNumber(true));
+		
+		if (getter) {
+			static id schemeHandlerClass = createSchemeHandlerClass();
+			schemeHandler = callSimple(schemeHandlerClass, "new");
+			objc_setAssociatedObject(schemeHandler, associatedObjectKey, (id)this, OBJC_ASSOCIATION_ASSIGN);
+			callSimple(config, "setURLSchemeHandler:forURLScheme:", schemeHandler, nsString("webview-gui"));
+		}
 		
 		id preferences = callSimple(config, "preferences");
 		callVoid(preferences, "setElementFullscreenEnabled:", nsNumber(false));
@@ -151,6 +217,7 @@ struct WebviewGui::Impl {
 	~Impl() {
 		using namespace _objc;
 		if (messageHandler) objc_setAssociatedObject(messageHandler, associatedObjectKey, (id)nullptr, OBJC_ASSOCIATION_ASSIGN);
+		if (schemeHandler) objc_setAssociatedObject(schemeHandler, associatedObjectKey, (id)nullptr, OBJC_ASSOCIATION_ASSIGN);
 		if (webview) callVoid(webview, "removeFromSuperview");
 	}
 };
@@ -162,17 +229,17 @@ WebviewGui * WebviewGui::create(Platform platform, const std::string &startPath,
 	if (!supports(platform)) return nullptr;
 	
 	using namespace _objc;
-	id baseUrl = callSimple("NSURL", "URLWithString:", "webview-gui://");
+	id baseUrl = callSimple("NSURL", "URLWithString:", nsString("webview-gui://"));
+	if (!baseUrl) return nullptr;
 	id url = callSimple("NSURL", "URLWithString:relativeToURL:", nsString(startPath.c_str()), baseUrl);
 	auto *request = _objc::callSimple("NSMutableURLRequest", "requestWithURL:", url);
 	
-	auto *impl = new Impl();
+	auto *impl = new Impl(std::move(getter));
 	if (!impl->webview) {
 		delete impl;
 		return nullptr;
 	}
-	//callSimple(impl->webview, "loadRequest:", request);
-	callSimple(impl->webview, "loadHTMLString:baseURL:", nsString("custom ResourceGetter not implemented yet"), baseUrl);
+	callSimple(impl->webview, "loadRequest:", request);
 	return new WebviewGui(impl);
 }
 WebviewGui * WebviewGui::create(Platform platform, const std::string &startUrl) {

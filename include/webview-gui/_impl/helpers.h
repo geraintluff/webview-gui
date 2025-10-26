@@ -526,6 +526,7 @@ std::string guessMediaType(const char *path) {
 		}
 	}
 	std::string ext = path + pos;
+	if (ext.empty()) return "text/html;charset=utf-8";
 	for (auto &c : ext) c |= 0x20; // lower-cases alphanumeric ascii
 	auto iter = extMap.find(ext);
 	if (iter == extMap.end()) return "application/octet-stream";
