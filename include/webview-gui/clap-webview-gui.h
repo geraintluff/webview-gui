@@ -9,6 +9,12 @@
 
 namespace webview_gui {
 
+static constexpr const char CLAP_EXT_WEBVIEW[] = "clap.webview/2";
+struct clap_plugin_webview {
+	int32_t (CLAP_ABI *get_uri)(const clap_plugin_t *plugin, char *uri, uint32_t uri_capacity);
+	bool(CLAP_ABI *receive)(const clap_plugin_t *plugin, const void *buffer, uint32_t size);
+};
+
 template<void *(pluginToThis)(const clap_plugin *)>
 struct ClapWebviewGui {
 	uint32_t width = 350, height = 200;
@@ -155,7 +161,7 @@ private:
 				std::strcpy(startUrlBuffer, "data:text/html,provide_starting_uri%20false");
 			}
 		} else {
-			std::strcpy(startUrlBuffer, "data:text/html,no%20plugin%20webview%2ext%20");
+			std::strcpy(startUrlBuffer, "data:text/html,no%20plugin%20webview%20ext");
 		}
 		return startUrlBuffer;
 	}
@@ -218,7 +224,7 @@ private:
 			baseDir = "/" + baseDir;
 #endif
 		}
-		if (startUrl[0] != '/') {
+		if (!isAbsolute && startUrl[0] != '/') {
 			startUrl = "/" + startUrl;
 		}
 		auto platform = clapApiToPlatform(api);
@@ -258,7 +264,8 @@ private:
 	}
 	
 	static bool gui_can_resize(const clap_plugin *plugin) {
-		return true;
+		auto &self = getSelf(plugin);
+		return self.resizeHints.can_resize_horizontally || self.resizeHints.can_resize_vertically;
 	}
 	
 	static bool gui_get_resize_hints(const clap_plugin *plugin, clap_gui_resize_hints_t *hints) {

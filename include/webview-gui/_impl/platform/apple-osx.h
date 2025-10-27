@@ -11,8 +11,6 @@ namespace webview_gui {
 
 // Objective-C helpers - we use `objc_msgSend` for "simple" return values (not structs, not floating-point)
 namespace _objc {
-	static constexpr const char *classNameStr = "FetchPP_fetch_handler_block";
-
 	template<typename Return=id, class... Args>
 	Return callSimple(id obj, const char *method, Args... args) {
 		// We have to cast `objc_msgSend` to a version with the arguments/return types
