@@ -6,13 +6,15 @@
 #include <memory>
 #include <string>
 #include <cctype>
+#include <algorithm>
 
 namespace webview_gui {
 
-static constexpr const char CLAP_EXT_WEBVIEW[] = "clap.webview/2";
+static constexpr const char CLAP_EXT_WEBVIEW[] = "clap.webview/3";
 struct clap_plugin_webview {
 	int32_t (CLAP_ABI *get_uri)(const clap_plugin_t *plugin, char *uri, uint32_t uri_capacity);
-	bool(CLAP_ABI *receive)(const clap_plugin_t *plugin, const void *buffer, uint32_t size);
+	bool (CLAP_ABI *get_resource)(const clap_plugin_t *plugin, const char *path, char *mime, uint32_t mime_capacity, const clap_ostream_t *stream);
+	bool (CLAP_ABI *receive)(const clap_plugin_t *plugin, const void *buffer, uint32_t size);
 };
 
 template<void *(pluginToThis)(const clap_plugin *)>
@@ -38,10 +40,10 @@ struct ClapWebviewGui {
 		hostWebview1 = (const clap_host_webview1 *)host->get_extension(host, CLAP_EXT_WEBVIEW1);
 		pluginWebview2 = (const clap_plugin_webview2 *)plugin->get_extension(plugin, CLAP_EXT_WEBVIEW2);
 		hostWebview2 = (const clap_host_webview2 *)host->get_extension(host, CLAP_EXT_WEBVIEW2);
-
-		// If we've fetched our own compatibility functions, remove them
-		if (pluginWebview1 == getExtension(CLAP_EXT_WEBVIEW1)) pluginWebview1 = nullptr;
-		if (pluginWebview2 == getExtension(CLAP_EXT_WEBVIEW2)) pluginWebview2 = nullptr;
+		pluginWebview3 = (const clap_plugin_webview3 *)plugin->get_extension(plugin, CLAP_EXT_WEBVIEW3);
+		hostWebview3 = (const clap_host_webview3 *)host->get_extension(host, CLAP_EXT_WEBVIEW3);
+		
+		initComplete = true;
 	}
 
 #ifdef WIN32
@@ -71,8 +73,18 @@ struct ClapWebviewGui {
 				gui_hide
 			};
 			return &ext;
-		} else if (!std::strcmp(extId, CLAP_EXT_WEBVIEW1)) {
-			if (pluginWebview2) {
+		}
+		if (!initComplete) return nullptr; // no proxies until we've finished `.init()`
+		if (!std::strcmp(extId, CLAP_EXT_WEBVIEW1)) {
+			if (pluginWebview3) {
+				static const clap_plugin_webview1 ext{
+					webview3to1_provide_starting_uri,
+					pluginWebview2->receive /* compatible */
+				};
+				auto *startUri = getNativeStartUrl();
+				if (!isAbsolute(startUri)) return nullptr; // relative URIs in v3 rely on `.get_resource()`
+				return &ext;
+			} else if (pluginWebview2) {
 				static const clap_plugin_webview1 ext{
 					webview2to1_provide_starting_uri,
 					pluginWebview2->receive /* compatible */
@@ -80,9 +92,33 @@ struct ClapWebviewGui {
 				return &ext;
 			}
 		} else if (!std::strcmp(extId, CLAP_EXT_WEBVIEW2)) {
-			if (pluginWebview1) {
+			if (pluginWebview3) {
+				static const clap_plugin_webview2 ext{
+					webview3to2_get_uri,
+					pluginWebview3->receive /* compatible */
+				};
+				auto *startUri = getNativeStartUrl();
+				if (!isAbsolute(startUri)) return nullptr; // relative URIs in v3 rely on `.get_resource()`
+				return &ext;
+			} else if (pluginWebview1) {
 				static const clap_plugin_webview2 ext{
 					webview1to2_get_uri,
+					pluginWebview1->receive /* compatible */
+				};
+				return &ext;
+			}
+		} else if (!std::strcmp(extId, CLAP_EXT_WEBVIEW3)) {
+			if (pluginWebview2) {
+				static const clap_plugin_webview3 ext{
+					webview1to3_get_uri,
+					webview3_ignore_get_resource,
+					pluginWebview1->receive /* compatible */
+				};
+				return &ext;
+			} else if (pluginWebview1) {
+				static const clap_plugin_webview3 ext{
+					webview1to3_get_uri,
+					webview3_ignore_get_resource,
 					pluginWebview1->receive /* compatible */
 				};
 				return &ext;
@@ -109,6 +145,7 @@ struct ClapWebviewGui {
 	}
 	
 private:
+	bool initComplete = false;
 	bool guiActive = false, guiVisible = false;
 	// if it's active but has no native implentation, then we're using the CLAP webview stuff directly
 	std::unique_ptr<WebviewGui> nativeWebview;
@@ -126,12 +163,20 @@ private:
 	};
 	static constexpr const char *CLAP_EXT_WEBVIEW2 = "clap.webview/2";
 	struct clap_plugin_webview2 {
-		int32_t (CLAP_ABI *get_uri)(const clap_plugin_t *plugin, char *uri, uint32_t uri_capacity);
+		int32_t(CLAP_ABI *get_uri)(const clap_plugin_t *plugin, char *uri, uint32_t uri_capacity);
 		bool(CLAP_ABI *receive)(const clap_plugin_t *plugin, const void *buffer, uint32_t size);
 	};
 	struct clap_host_webview2 {
 		bool(CLAP_ABI *send)(const clap_host_t *host, const void *buffer, uint32_t size);
 	};
+
+	static constexpr const char *CLAP_EXT_WEBVIEW3 = "clap.webview/3";
+	struct clap_plugin_webview3 {
+		int32_t(CLAP_ABI *get_uri)(const clap_plugin_t *plugin, char *uri, uint32_t uri_capacity);
+		bool(CLAP_ABI *get_resource)(const clap_plugin_t *plugin, const char *path, char *mime, uint32_t mime_capacity, const clap_ostream_t *data_stream);
+		bool(CLAP_ABI *receive)(const clap_plugin_t *plugin, const void *buffer, uint32_t size);
+	};
+	using clap_host_webview3 = clap_host_webview2;
 
 	const clap_plugin *plugin = nullptr;
 	const clap_host *host = nullptr;
@@ -142,6 +187,8 @@ private:
 	const clap_host_webview1 *hostWebview1 = nullptr;
 	const clap_plugin_webview2 *pluginWebview2 = nullptr;
 	const clap_host_webview2 *hostWebview2 = nullptr;
+	const clap_plugin_webview3 *pluginWebview3 = nullptr;
+	const clap_host_webview3 *hostWebview3 = nullptr; // for clarity, even though it's the same as v2
 
 	static ClapWebviewGui & getSelf(const clap_plugin *plugin) {
 		return *(ClapWebviewGui *)pluginToThis(plugin);
@@ -149,8 +196,15 @@ private:
 	
 	char startUrlBuffer[2048] = {0};
 	const char * getNativeStartUrl() {
-		if (pluginWebview2) {
-			auto uriLength = pluginWebview2->get_uri(plugin, startUrlBuffer, 2048);
+		if (pluginWebview3) {
+			auto uriLength = pluginWebview3->get_uri(plugin, startUrlBuffer, 2047);
+			if (uriLength > 2048) {
+				std::strcpy(startUrlBuffer, "data:text/html,URI%20too%20long");
+			} else if (uriLength <= 0) {
+				std::strcpy(startUrlBuffer, "data:text/html,get_uri%20error");
+			}
+		} else if (pluginWebview2) {
+			auto uriLength = pluginWebview2->get_uri(plugin, startUrlBuffer, 2047);
 			if (uriLength > 2048) {
 				std::strcpy(startUrlBuffer, "data:text/html,URI%20too%20long");
 			} else if (uriLength <= 0) {
@@ -164,6 +218,20 @@ private:
 			std::strcpy(startUrlBuffer, "data:text/html,no%20plugin%20webview%20ext");
 		}
 		return startUrlBuffer;
+	}
+	
+	static bool isAbsolute(const char *uri) {
+		if (*uri == ':') return false; // absolute URIs can't start with `:`
+		while (*uri) {
+			auto c = *(uri++);
+			if (c == ':') return true; // a valid scheme followed by `:`
+			if (c >= 'A' && c <= 'Z') continue;
+			if (c >= 'a' && c <= 'z') continue;
+			if (c >= '0' && c <= '9') continue;
+			if (c == '+' || c == '.' || c == '-') continue;
+			return false; // not a valid scheme
+		}
+		return false; // reached the end without any non-scheme characters, but no `:`
 	}
 	
 	static WebviewGui::Platform clapApiToPlatform(const char *api) {
@@ -196,24 +264,24 @@ private:
 		}
 		
 		std::string startUrl = self.getNativeStartUrl();
-		bool isAbsolute = true; // look for `scheme:`
-		for (size_t i = 0; i < startUrl.size(); ++i) {
-			if (std::isalnum(startUrl[i])) continue;
-			if (i > 0 && startUrl[i] == ':') break;
-			isAbsolute = false;
-			break;
+		if (!isAbsolute(startUrl.c_str()) && startUrl[0] != '/') {
+			// relative URLs assumed to be absolute paths
+			startUrl = "/" + startUrl;
 		}
-		std::string baseDir = self.resourcePath;
+
+		auto platform = clapApiToPlatform(api);
+		WebviewGui *ptr;
+
 		if (startUrl.substr(0, 5) == "file:") { // absolute file path
 			// strip `file:` and all leading `/`s
 			size_t pos = 5;
 			while (startUrl[pos] == '/') ++pos;
 			startUrl = startUrl.substr(pos);
-			baseDir = startUrl;
 			
-			while (!baseDir.empty() && baseDir.back() != '/') {
-				baseDir.pop_back();
-			}
+			std::string baseDir = startUrl;
+			// drop the file
+			while (!baseDir.empty() && baseDir.back() != '/') baseDir.pop_back();
+			// and the final `/`
 			if (!baseDir.empty()) baseDir.pop_back();
 			startUrl = startUrl.substr(baseDir.size());
 #if defined (_WIN32) || defined (_WIN64)
@@ -221,19 +289,45 @@ private:
 				if (c == '/') c = '\\';
 			}
 #else
-			baseDir = "/" + baseDir;
+			// We stripped the `/` above, add it back in
+			if (baseDir[0] != '/') baseDir = "/" + baseDir;
 #endif
+			ptr = WebviewGui::create(platform, startUrl.c_str(), baseDir);
+		} else {
+			ptr = WebviewGui::create(platform, startUrl.c_str(), [plugin](const char *path, WebviewGui::Resource &resource){
+				auto *pluginWebview3 = getSelf(plugin).pluginWebview3;
+				if (!pluginWebview3) return false;
+				
+				char mediaType[256] = {0};
+				struct ResourceStream : public clap_ostream {
+					WebviewGui::Resource &resource;
+					
+					ResourceStream(WebviewGui::Resource &resource) : resource(resource) {
+						*(clap_ostream *)this = {
+							.ctx=this,
+							.write=write
+						};
+					}
+					static int64_t write(const clap_ostream *stream, const void *buffer, uint64_t length) {
+						auto *byteBuffer = (const unsigned char *)buffer;
+						auto &self = *(ResourceStream *)stream;
+						self.resource.bytes.insert(self.resource.bytes.end(), byteBuffer, byteBuffer + length);
+						return int64_t(length);
+					};
+				} resourceStream{resource};
+				bool success = pluginWebview3->get_resource(plugin, path, mediaType, 255, &resourceStream);
+				if (success) resource.mediaType = mediaType;
+				return success;
+			});
 		}
-		if (!isAbsolute && startUrl[0] != '/') {
-			startUrl = "/" + startUrl;
-		}
-		auto platform = clapApiToPlatform(api);
-		auto *ptr = WebviewGui::create(platform, startUrl.c_str(), baseDir);
+		
 		if (ptr) {
 			self.nativeWebview = std::unique_ptr<WebviewGui>{ptr};
 			self.nativeWebview->receive = [plugin](const unsigned char *bytes, size_t length){
 				auto &self = getSelf(plugin);
-				if (self.pluginWebview2) {
+				if (self.pluginWebview3) {
+					self.pluginWebview3->receive(self.plugin, (const void *)bytes, uint32_t(length));
+				} else if (self.pluginWebview2) {
 					self.pluginWebview2->receive(self.plugin, (const void *)bytes, uint32_t(length));
 				} else if (self.pluginWebview1) {
 					self.pluginWebview1->receive(self.plugin, (const void *)bytes, uint32_t(length));
@@ -336,6 +430,12 @@ private:
 		return (uriLength > 0) && (uriLength <= capacity);
 	}
 
+	static bool webview3to1_provide_starting_uri(const clap_plugin_t *plugin, char *startingUri, uint32_t capacity) {
+		auto &self = getSelf(plugin);
+		auto uriLength = self.pluginWebview3->get_uri(plugin, startingUri, capacity);
+		return (uriLength > 0) && (uriLength <= capacity) && isAbsolute(startingUri);
+	}
+
 	static int32_t webview1to2_get_uri(const clap_plugin_t *plugin, char *startingUri, uint32_t capacity) {
 		auto &self = getSelf(plugin);
 		if (!self.pluginWebview1->provide_starting_uri(plugin, startingUri, capacity)) {
@@ -345,6 +445,26 @@ private:
 			if (startingUri[i] == 0) return i;
 		}
 		return capacity;
+	}
+	static int32_t webview3to2_get_uri(const clap_plugin_t *plugin, char *startingUri, uint32_t capacity) {
+		auto &self = getSelf(plugin);
+		auto uriLength = self.pluginWebview3->get_uri(plugin, startingUri, capacity);
+		if (uriLength <= 0 || uriLength > capacity) return uriLength; // failure
+		if (!isAbsolute(startingUri)) return -1; // can't translate relative URIs, since they need `.get_resource()`
+		return uriLength;
+	}
+
+	static int32_t webview1to3_get_uri(const clap_plugin_t *plugin, char *startingUri, uint32_t capacity) {
+		if (capacity < 7) return -1; // too short
+		auto uriLength2 = webview1to2_get_uri(plugin, startingUri, capacity - 7);
+		if (uriLength2 <= 0) return uriLength2; // failure
+		std::rotate(startingUri, startingUri + (capacity - 7), startingUri + capacity);
+		std::strncpy(startingUri, "file://", 7);
+		return uriLength2 + 7;
+	}
+	
+	static bool webview3_ignore_get_resource(const clap_plugin_t *, const char *, char *, uint32_t, const clap_ostream_t *) {
+		return false;
 	}
 };
 

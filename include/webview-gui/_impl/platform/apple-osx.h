@@ -41,6 +41,15 @@ namespace _objc {
 	bool instanceOf(id obj, const char *className) {
 		return callSimple<bool>(obj, "isKindOfClass:", (id)objc_getClass(className));
 	}
+	
+	struct ScopedRelease {
+		id obj;
+		ScopedRelease(id obj) : obj(obj) {}
+		~ScopedRelease() {
+			if (obj) callVoid(obj, "release");
+		}
+	};
+#define SCOPED_RELEASE(obj) _objc::ScopedRelease release_##obj{obj};
 }
 
 struct WebviewGui::Impl {
@@ -93,6 +102,7 @@ struct WebviewGui::Impl {
 		resource.mediaType = _helpers::guessMediaType(pathStr);
 		if (!impl->getter(pathStr, resource)) {
 			id response = callSimple("NSHTTPURLResponse", "alloc");
+			SCOPED_RELEASE(response);
 			response = callSimple(
 				response,
 				"initWithURL:statusCode:HTTPVersion:headerFields:",
@@ -120,6 +130,7 @@ struct WebviewGui::Impl {
 			nsString("HTTP/1.1"),
 			headers
 		);
+		SCOPED_RELEASE(response);
 		callSimple(urlSchemeTask, "didReceiveResponse:", response);
 		id data = callSimple("NSData", "dataWithBytes:length:", (const void *)resource.bytes.data(), (unsigned long)resource.bytes.size());
 		callSimple(urlSchemeTask, "didReceiveData:", data);
@@ -196,27 +207,29 @@ struct WebviewGui::Impl {
 			}, {capture: true});
 		)JS";
 		id initScript = callSimple("WKUserScript", "alloc");
+		SCOPED_RELEASE(initScript);
 		if (initScript) initScript = callSimple(initScript, "initWithSource:injectionTime:forMainFrameOnly:", nsString(initJs), int(0)/*WKUserScriptInjectionTimeAtDocumentStart*/, true);
-		if (initScript) {
-			callSimple(contentController, "addUserScript:", initScript);
-			callVoid(initScript, "release");
-		}
+		if (!initScript) return;
+		callSimple(contentController, "addUserScript:", initScript);
 		
 		messageHandler = callSimple(messageHandlerClass, "new");
 		objc_setAssociatedObject(messageHandler, associatedObjectKey, (id)this, OBJC_ASSOCIATION_ASSIGN);
 		callSimple(contentController, "addScriptMessageHandler:name:", messageHandler, nsString("webviewGui_receive"));
+		callVoid(messageHandler, "release");
 		
 		webview = callSimple("WKWebView", "alloc");
 		CGRect frame{{0, 0}, {100, 100}};
 		if (webview) webview = callSimple(webview, "initWithFrame:configuration:", frame, config);
-		callVoid(config, "release");
 	}
 	
 	~Impl() {
 		using namespace _objc;
 		if (messageHandler) objc_setAssociatedObject(messageHandler, associatedObjectKey, (id)nullptr, OBJC_ASSOCIATION_ASSIGN);
 		if (schemeHandler) objc_setAssociatedObject(schemeHandler, associatedObjectKey, (id)nullptr, OBJC_ASSOCIATION_ASSIGN);
-		if (webview) callVoid(webview, "removeFromSuperview");
+		if (webview) {
+			callVoid(webview, "removeFromSuperview");
+			callVoid(webview, "release");
+		}
 	}
 };
 
@@ -311,3 +324,4 @@ void WebviewGui::setVisible(bool visible) {}
 
 } // namespace
 
+#undef SCOPED_RELEASE
