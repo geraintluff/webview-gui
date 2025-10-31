@@ -198,14 +198,14 @@ private:
 	const char * getNativeStartUrl() {
 		if (pluginWebview3) {
 			auto uriLength = pluginWebview3->get_uri(plugin, startUrlBuffer, 2047);
-			if (uriLength > 2048) {
+			if (uriLength >= 2048) {
 				std::strcpy(startUrlBuffer, "data:text/html,URI%20too%20long");
 			} else if (uriLength <= 0) {
 				std::strcpy(startUrlBuffer, "data:text/html,get_uri%20error");
 			}
 		} else if (pluginWebview2) {
 			auto uriLength = pluginWebview2->get_uri(plugin, startUrlBuffer, 2047);
-			if (uriLength > 2048) {
+			if (uriLength >= 2048) {
 				std::strcpy(startUrlBuffer, "data:text/html,URI%20too%20long");
 			} else if (uriLength <= 0) {
 				std::strcpy(startUrlBuffer, "data:text/html,get_uri%20error");
