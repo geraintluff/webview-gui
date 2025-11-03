@@ -96,8 +96,8 @@ struct WebviewGui::Impl {
 		if (!impl || !impl->main) return;
 		id request = callSimple(urlSchemeTask, "request");
 		id url = callSimple(request, "URL");
-		id path = callSimple(url, "path");
-		auto *pathStr = callSimple<const char *>(path, "UTF8String");
+		auto *urlStr = callSimple<const char *>(callSimple(url, "absoluteString"), "UTF8String");
+		auto *pathStr = urlStr + std::strlen("webview-gui://"); // using `path` or similar will remove trailing `/`
 		Resource resource;
 		resource.mediaType = _helpers::guessMediaType(pathStr);
 		if (!impl->getter(pathStr, resource)) {
