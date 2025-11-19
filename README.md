@@ -72,13 +72,13 @@ Additionally, I would like to make some existing JS APIs usable in webviews:
 
 ## CLAP helper
 
-There is a [draft CLAP extension](https://github.com/free-audio/clap/blob/ee8af6c82551aac6f5e8a0d5bd1980cc9c8d832b/include/clap/ext/draft/webview.h) for using webview UIs.  This is the primary way that WCLAPs (CLAPs compiled to WebAssembly) can provide a GUI, but it's an increasingly common pattern for native plugins as well.  The extension follows exactly the pattern above: passing opaque bytes between the (W)CLAP plugin and the webview/`<iframe>`.
+There is a [draft CLAP extension](https://github.com/free-audio/clap/blob/ee8af6c82551aac6f5e8a0d5bd1980cc9c8d832b/include/clap/ext/draft/webview.h) for using webview UIs.  This is the primary way that WCLAPs (CLAPs compiled to WebAssembly) can provide a GUI, but it's an increasingly common pattern for native apps/plugins in general.  The extension follows the pattern above: passing messages as opaque bytes between the (W)CLAP plugin and the webview/`<iframe>`, as well as optionally providing custom resources.
 
-Native hosts don't support this extension (and are unlikely to), so this repo includes a helper (in[`clap-webview-gui.h`](include/webview-gui/clap-webview-gui.h)) which implements the `clap.gui` extension, based on the plugin's webview extension.  You can replace any methods from this extension, for example to define your own (re)sizing hints and logic (which even webview-based hosts can inspect using `clap.gui`). 
+Native hosts don't support this webview extension (and are unlikely to), so this repo includes a helper (in [`clap-webview-gui.h`](include/webview-gui/clap-webview-gui.h)) which implements the `clap.gui` extension, based on the plugin's webview extension.  You can replace any methods from this extension, for example to define your own (re)sizing logic (which can be used by webview-based hosts as well). 
 
-It also provides a "host webview extension", which you should use (instead of checking the host's actual webview extension).  This will forward messages to either the native webview, or the host (if it does support webviews), as appropriate.
+The helper provides a "host webview extension", which you should use instead of checking the host's actual webview extension.  Even if a host *does* support the webview extension, this replacement will send messages to its native webview instead, if one currently exists.  This helps the plugin pretend that only webview GUIs are actually being used.
  
-The idea is for webview-based CLAP plugins to primarily use the webview extension, and let this helper wire up the `clap.gui`, only overriding that where relevant.  You can also call all the
+The idea is for webview-based CLAP plugins to primarily use the webview extension, and let this helper wire up the `clap.gui`, only overriding that where relevant.
 
 ```cpp
 struct MyClapPlugin {

@@ -55,7 +55,7 @@ struct ClapWebviewGui {
 		pluginWebview = (const clap_plugin_webview *)plugin->get_extension(plugin, CLAP_EXT_WEBVIEW);
 		hostWebview = (const clap_host_webview *)host->get_extension(host, CLAP_EXT_WEBVIEW);
 	}
-
+	
 	/* ---- Plugin GUI methods ----
 	The simplest way to use this helper is the two pointers above.  These are the methods which the plugin GUI extension calls by default.
 	
@@ -215,9 +215,8 @@ struct ClapWebviewGui {
 	}
 
 	/* ---- Host Webview methods ----
-	Th
 	
-	If that seems weird, use this instead
+	This is what the replacement host extension calls, but if using that weirds you out, you can call this instead.
 	*/
 
 	// This is a host method
