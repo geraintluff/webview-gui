@@ -33,7 +33,7 @@ struct ClapWebviewGui {
 	// If no native webview is active, then this forwards to the actual host extension anyway
 	const clap_host_webview *extHostWebview;
 
-	ClapWebviewGui(const clap_plugin *plugin=nullptr, const clap_host *host=nullptr, std::string resourcePath="") : plugin(plugin), host(host), resourcePath(std::move(resourcePath)) {
+	ClapWebviewGui(const clap_plugin *plugin=nullptr, const clap_host *host=nullptr) : plugin(plugin), host(host) {
 		setSelf(plugin);
 		setSelf(host);
 		extPluginGui = &pluginGuiProxy;
@@ -41,14 +41,13 @@ struct ClapWebviewGui {
 	}
 	
 	// Call from `plugin.init()`
-	void init(const clap_plugin *initPlugin, const clap_host *initHost, const std::string &initResourcePath="") {
+	void init(const clap_plugin *initPlugin, const clap_host *initHost) {
 		clearSelf(plugin);
 		clearSelf(host);
 		plugin = initPlugin;
 		host = initHost;
 		setSelf(plugin);
 		setSelf(host);
-		if (initResourcePath.size()) resourcePath = initResourcePath;
 
 		init();
 	}
@@ -237,7 +236,6 @@ private:
 	uint32_t width = 400, height = 250;
 	const clap_plugin *plugin = nullptr;
 	const clap_host *host = nullptr;
-	std::string resourcePath;
 
 	std::unique_ptr<WebviewGui> nativeWebview;
 
