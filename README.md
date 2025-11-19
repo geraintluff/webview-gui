@@ -74,48 +74,66 @@ Additionally, I would like to make some existing JS APIs usable in webviews:
 
 There is a [draft CLAP extension](https://github.com/free-audio/clap/blob/ee8af6c82551aac6f5e8a0d5bd1980cc9c8d832b/include/clap/ext/draft/webview.h) for using webview UIs.  This is the primary way that WCLAPs (CLAPs compiled to WebAssembly) can provide a GUI, but it's an increasingly common pattern for native plugins as well.  The extension follows exactly the pattern above: passing opaque bytes between the (W)CLAP plugin and the webview/`<iframe>`.
 
-Native hosts don't support this extension (and are unlikely to), so this repo includes a helper (in[`clap-webview-gui.h`](include/webview-gui/clap-webview-gui.h)) which implements the `clap.gui` extension, based on the plugin's webview extension.  This helper can be configured with size/resizing hints, which even webview-supporting hosts may inspect through `clap.gui`. 
+Native hosts don't support this extension (and are unlikely to), so this repo includes a helper (in[`clap-webview-gui.h`](include/webview-gui/clap-webview-gui.h)) which implements the `clap.gui` extension, based on the plugin's webview extension.  You can replace any methods from this extension, for example to define your own (re)sizing hints and logic (which even webview-based hosts can inspect using `clap.gui`). 
 
-The idea is for webview-based CLAP plugins to just implement the webview extension, and use this helper for `clap.gui`.  This helper _also_ provides compatibility layers, to support older/newer versions of the webview extension.
+It also provides a "host webview extension", which you should use (instead of checking the host's actual webview extension).  This will forward messages to either the native webview, or the host (if it does support webviews), as appropriate.
+ 
+The idea is for webview-based CLAP plugins to primarily use the webview extension, and let this helper wire up the `clap.gui`, only overriding that where relevant.  You can also call all the
 
 ```cpp
 struct MyClapPlugin {
 	const clap_plugin clapPlugin{...};
 	const clap_host *host;
 
-	MyClapPlugin(const clap_host *host) : host(host) {...}
+	webview_gui::ClapWebviewGui guiHelper;
+	const clap_host_webview *hostWebview;
 
-	// The helper needs to be able to find itself from its callbacks
-	static void * pluginToGuiHelper(const clap_plugin *plugin) {
-		auto &myClapPlugin = getSelf(plugin);
-		return &myClapPlugin.guiHelper;
+	MyClapPlugin(const clap_host *host) : host(host) {
+		guiHelper.setSize(600, 300);
 	}
-	webview_gui::ClapWebviewGui<pluginToGuiHelper> guiHelper;
-
-	// Use the helper to send messages (adapts to whichever extensions the host actually supports)
+	
 	void someMainThreadMethod() {
 		auto *message = "message-bytes";
-		auto success = guiHelper.send((const unsigned char *)message, std::strlen(message));
-		// ... it *shouldn't* fail, but it's allowed to according to the webview extension(s)
+		auto *bytes = (const unsigned char *)message;
+		uint32_t length = std::strlen(message);
+
+		// You can either call the helper to send messages directly:
+		auto success = guiHelper.send(bytes, length);
+		
+		// Or use the host webview extension (which is always defined by the helper)
+		auto *hostExt = guiHelper.extHostWebview;
+		hostExt->send(host, bytes, length);
 	}
 	
 	//----- `clap_plugin` methods -----
 	static bool plugin_init(const clap_plugin *plugin) {
-		auto &myClapPlugin = getSelf(plugin);
-		// ... all your existing stuff
+		auto &self = getSelf(plugin); // somehow - in this case just casting the pointer would work
+		
+		// ... various setup bits
 
-		// If the webview extension returns a relative path, it's resolved against this
-		auto resourcePath = getBundleResourcePath();
-
-		// This queries the plugin itself for (webview) extensions, so only call when that's ready 
-		myClapPlugin.guiHelper.init(plugin, myClapPlugin.host, resourcePath);
+		// This queries the plugin itself for (webview) extensions, so only call this when that's ready 
+		self.guiHelper.init(plugin, self.host);
+		self.hostWebview = self.guiHelper.extHostWebview;
 	}
 	static void * plugin_get_extension(const clap_plugin *plugin, const char *extId) {
 		auto &myClapPlugin = getSelf(plugin);
 		// ... all your existing stuff
 
 		// This provides the `clap.gui` extension, as well as adapters for any version of the webview extension
-		return myClapPlugin.guiHelper.getExtension(extId);
+		if (!std::strcmp(extId, CLAP_EXT_GUI)) {
+			// Override with a custom size function
+			guiHelper.extPluginGui->adjustSize = gui_adjust_size;
+			
+			return guiHelper.extPluginGui;
+		}
+	}
+	
+	//----- subset of `clap_gui` methods -----
+	static bool gui_adjust_size(const clap_plugin *plugin, uint32_t *w, uint32_t *h) {
+		// enforce minimum size
+		if (*w < 300) *w = 300;
+		if (*h < 200) *h = 200;
+		return true;
 	}
 };
 ```

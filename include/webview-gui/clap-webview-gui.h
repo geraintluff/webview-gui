@@ -26,8 +26,6 @@ struct clap_host_webview {
 };
 
 struct ClapWebviewGui {
-	uint32_t width = 400, height = 250;
-
 	// Default plugin GUI extension - replace any methods you like (e.g. for sizing)
 	clap_plugin_gui *extPluginGui;
 
@@ -236,6 +234,7 @@ struct ClapWebviewGui {
 	}
 	
 private:
+	uint32_t width = 400, height = 250;
 	const clap_plugin *plugin = nullptr;
 	const clap_host *host = nullptr;
 	std::string resourcePath;
