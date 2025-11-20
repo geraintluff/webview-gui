@@ -118,7 +118,7 @@ struct MyClapPlugin {
 		auto &myClapPlugin = getSelf(plugin);
 		// ... all your existing stuff
 
-		// This provides the `clap.gui` extension, as well as adapters for any version of the webview extension
+		// This provides a default implementation of the `clap.gui` extension
 		if (!std::strcmp(extId, CLAP_EXT_GUI)) {
 			// Override with a custom size function
 			guiHelper.extPluginGui->adjustSize = gui_adjust_size;
