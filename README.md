@@ -100,9 +100,8 @@ struct MyClapPlugin {
 		// You can either call the helper to send messages directly:
 		auto success = guiHelper.send(bytes, length);
 		
-		// Or use the host webview extension (which is always defined by the helper)
-		auto *hostExt = guiHelper.extHostWebview;
-		hostExt->send(host, bytes, length);
+		// Or use the host webview extension (actually provided by the helper)
+		hostWebview->send(host, bytes, length);
 	}
 	
 	//----- `clap_plugin` methods -----
