@@ -4,9 +4,9 @@
 #include <string>
 #include <unordered_map>
 
-namespace webview_gui { namespace _helpers {
+namespace webview_gui { namespace helpers {
 
-void decodeBase64(const char *base64, std::vector<unsigned char> &binary) {
+inline void decodeBase64(const char *base64, std::vector<unsigned char> &binary) {
 	auto done = [](char c) -> bool {
 		return !c || c == '=';
 	};
@@ -39,13 +39,13 @@ void decodeBase64(const char *base64, std::vector<unsigned char> &binary) {
 		binary.push_back(((v2&0x03)<<6)|v3);
 	}
 }
-std::vector<unsigned char> decodeBase64(const char *base64) {
+inline std::vector<unsigned char> decodeBase64(const char *base64) {
 	std::vector<unsigned char> binary;
 	decodeBase64(base64, binary);
 	return binary;
 }
 
-void encodeBase64(const unsigned char *bytes, size_t length, std::string &base64) {
+inline void encodeBase64(const unsigned char *bytes, size_t length, std::string &base64) {
 	static constexpr const char *base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	while (length--) {
 		auto v0 = *(bytes++);
@@ -76,13 +76,13 @@ void encodeBase64(const unsigned char *bytes, size_t length, std::string &base64
 		base64.push_back(base64Chars[v2&0x3F]);
 	}
 }
-std::string encodeBase64(const unsigned char *bytes, size_t length) {
+inline std::string encodeBase64(const unsigned char *bytes, size_t length) {
 	std::string base64;
 	encodeBase64(bytes, length, base64);
 	return base64;
 }
 
-std::string guessMediaType(const char *path) {
+inline std::string guessMediaType(const char *path) {
 	static const std::unordered_map<std::string, std::pair<const char *, const char *>> extMap{
 		{"3g2", {"video", "3gpp2"}},
 		{"3gp", {"video", "3gpp"}},

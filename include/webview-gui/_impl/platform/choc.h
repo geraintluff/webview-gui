@@ -1,4 +1,4 @@
-#include "../helpers.h"
+#include "../../helpers.h"
 
 #include "choc/platform/choc_Platform.h"
 
@@ -85,7 +85,7 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 			if (resource.mediaType.size()) {
 				chocResource->mimeType = std::move(resource.mediaType);
 			} else {
-				chocResource->mimeType = _helpers::guessMediaType(path.c_str());
+				chocResource->mimeType = helpers::guessMediaType(path.c_str());
 			}
 		}
 		return chocResource;

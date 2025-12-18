@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../helpers.h"
+#include "../../helpers.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CGGeometry.h>
@@ -71,7 +71,7 @@ struct WebviewGui::Impl {
 		id body = callSimple(message, "body");
 		if (instanceOf(body, "NSString")) {
 			auto *base64 = callSimple<const char *>(body, "UTF8String");
-			auto binary = _helpers::decodeBase64(base64);
+			auto binary = helpers::decodeBase64(base64);
 			receiveFn((const unsigned char *)binary.data(), binary.size());
 		}
 	}
@@ -99,7 +99,7 @@ struct WebviewGui::Impl {
 		auto *urlStr = callSimple<const char *>(callSimple(url, "absoluteString"), "UTF8String");
 		auto *pathStr = urlStr + std::strlen("webview-gui://"); // using `path` or similar will remove trailing `/`
 		Resource resource;
-		resource.mediaType = _helpers::guessMediaType(pathStr);
+		resource.mediaType = helpers::guessMediaType(pathStr);
 		if (!impl->getter(pathStr, resource)) {
 			id response = callSimple("NSHTTPURLResponse", "alloc");
 			SCOPED_RELEASE(response);
@@ -309,7 +309,7 @@ void WebviewGui::attach(void *platformNative) {
 }
 void WebviewGui::send(const unsigned char *bytes, size_t length) {
 	std::string js = "window.dispatchEvent(new MessageEvent('message',{data:Uint8Array.fromBase64('";
-	_helpers::encodeBase64(bytes, length, js);
+	helpers::encodeBase64(bytes, length, js);
 	js += "').buffer}))";
 
 	using namespace _objc;

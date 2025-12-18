@@ -11,6 +11,8 @@ Webview GUIs in C++ with simple message-passing, intended for (audio) plugins.  
 * Serve files from a directory, or a custom callback
 * CMake support, _or_ header-only C++ for simplicity
 
+Currently, MacOS (Cocoa) is supported directly.  If CHOC is available in the include path (tested using `__has_include()`) then it's used for other platforms.
+
 ## How to use
 
 See [`webview-gui.h`](include/webview-gui/webview-gui.h) for the API.  Here's an example using the VST3 platform identifiers:
@@ -51,11 +53,11 @@ When included via CMake, it adds a source file for the actual implementation.
 
 To use in a header-only way (without this source file), use `#define WEBVIEW_GUI_HEADER_ONLY` before including the above header.
 
-### Why not use CHOC?
+### Why not just use CHOC?
 
-[CHOC's WebView class](https://github.com/Tracktion/choc/blob/main/choc/gui/choc_WebView.h) is great, but it still requires platform-specific code to attach to the native views.  It also doesn't handle the gnarly event-view stuff, and is slightly more opinionated about how values are passed between C++/JS.
+[CHOC's WebView class](https://github.com/Tracktion/choc/blob/main/choc/gui/choc_WebView.h) is great, but it still requires platform-specific code to attach to the native views.
 
-This library does (currently) use CHOC under the hood, except for OSX (Cocoa).
+It also doesn't handle the gnarly event-view stuff, is slightly more opinionated about how values are passed between C++/JS, and fails to compile on non-supported platforms (instead of falling back to a placeholder implementation like this library does).
 
 ## TODOs
 
@@ -64,6 +66,7 @@ Thanks to August / Imagiro for sharing their [implementation](https://github.com
 * Key event stuff (Mac and Windows have separate problems)
 * Absolute paths for dragged-in files
 * A crash on Mac if you press Esc(?)
+* CHOC-free implementations for MacOS
 
 Additionally, I would like to make some existing JS APIs usable in webviews: 
 
@@ -72,7 +75,7 @@ Additionally, I would like to make some existing JS APIs usable in webviews:
 
 ## CLAP helper
 
-There is a [draft CLAP extension](https://github.com/free-audio/clap/blob/ee8af6c82551aac6f5e8a0d5bd1980cc9c8d832b/include/clap/ext/draft/webview.h) for using webview UIs.  This is the primary way that WCLAPs (CLAPs compiled to WebAssembly) can provide a GUI, but it's an increasingly common pattern for native apps/plugins in general.  The extension follows the pattern above: passing messages as opaque bytes between the (W)CLAP plugin and the webview/`<iframe>`, as well as optionally providing custom resources.
+There is a [draft CLAP extension](https://github.com/free-audio/clap/blob/main/include/clap/ext/draft/webview.h) for using webview UIs.  This is the primary way that [WCLAPs](https://github.com/WebCLAP/) (CLAPs compiled to WebAssembly) can provide a GUI, but it's an increasingly common pattern for native apps/plugins in general.  The extension follows the pattern above: passing messages as opaque bytes between the (W)CLAP plugin and the webview/`<iframe>`, as well as optionally providing custom resources.
 
 Native hosts don't support this webview extension (and are unlikely to), so this repo includes a helper (in [`clap-webview-gui.h`](include/webview-gui/clap-webview-gui.h)) which implements the `clap.gui` extension, based on the plugin's webview extension.  You can replace any methods from this extension, for example to define your own (re)sizing logic (which can be used by webview-based hosts as well). 
 
