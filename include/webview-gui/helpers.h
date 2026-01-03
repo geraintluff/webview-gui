@@ -517,7 +517,15 @@ inline std::string guessMediaType(const char *path) {
 		{"yml", {"text", "yaml"}},
 		{"zip", {"application", "zip"}}
 	};
-	size_t pos = std::strlen(path);
+	size_t posEnd = std::strlen(path);
+	for (size_t i = 0; i < posEnd; ++i) {
+		auto c = path[i];
+		if (c == '?' || c == '#') { // strip query or hash
+			posEnd = i;
+			break;
+		}
+	}
+	size_t pos = posEnd;
 	while (pos > 0) {
 		auto c = path[--pos];
 		if (c == '.' || c == '/') {
@@ -525,7 +533,7 @@ inline std::string guessMediaType(const char *path) {
 			break;
 		}
 	}
-	std::string ext = path + pos;
+	std::string ext{path + pos, path + posEnd};
 	if (ext.empty()) return "text/html;charset=utf-8";
 	for (auto &c : ext) c |= 0x20; // lower-cases alphanumeric ascii
 	auto iter = extMap.find(ext);
