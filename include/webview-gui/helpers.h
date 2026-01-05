@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <cstring>
 
 namespace webview_gui { namespace helpers {
 
@@ -542,9 +543,8 @@ inline std::string guessMediaType(const char *path) {
 	if (!std::strcmp(pair.first, "text")) {
 		// Assume all text is UTF-8, because it really should be
 		return std::string(pair.first) + "/" + pair.second + ";charset=utf-8";
-	} else {
-		return std::string(pair.first) + "/" + pair.second;
 	}
+	return std::string(pair.first) + "/" + pair.second;
 }
 
 }} // namespace
