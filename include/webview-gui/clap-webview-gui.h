@@ -121,10 +121,7 @@ struct ClapWebviewGui {
 					WebviewGui::Resource &resource;
 					
 					ResourceStream(WebviewGui::Resource &resource) : resource(resource) {
-						*(clap_ostream *)this = {
-							.ctx=this,
-							.write=write
-						};
+						*(clap_ostream *)this = {/*ctx*/this, write};
 					}
 					static int64_t write(const clap_ostream *stream, const void *buffer, uint64_t length) {
 						auto *byteBuffer = (const unsigned char *)buffer;
@@ -300,7 +297,7 @@ private:
 
 	// Our proxies
 	clap_host_webview hostWebviewProxy{
-		.send=host_webview_send
+		host_webview_send
 	};
 	clap_plugin_gui pluginGuiProxy{
 		gui_is_api_supported,
