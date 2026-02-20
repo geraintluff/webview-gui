@@ -65,14 +65,14 @@ struct WebviewGui::Impl {
 	void attach(void *parent) {
 		LOG_EXPR(parent);
 		auto* parentHandle = static_cast<::HWND>(parent);
-		auto* webviewHandle = static_cast<::HWND>(webview.getViewHandle());
+		auto* webviewHandle = static_cast<::HWND>(webview->getViewHandle());
 		::SetWindowPos(webviewHandle, NULL, 0, 0, 500, 500, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE | SWP_FRAMECHANGED);
 		::SetWindowLongPtrW(webviewHandle, GWL_STYLE, WS_CHILD);
 		::SetParent(webviewHandle, parentHandle);
 		::ShowWindow(webviewHandle, SW_SHOW);
 	}
 	void setSize(double width, double height) {
-		auto* hwnd = static_cast<::HWND>(webview.getViewHandle());
+		auto* hwnd = static_cast<::HWND>(webview->getViewHandle());
 		::SetWindowPos(hwnd, NULL, 0, 0, static_cast<int>(width), static_cast<int>(height), SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE | SWP_FRAMECHANGED);
 		LOG_EXPR(width);
 		LOG_EXPR(height);
