@@ -10,6 +10,7 @@
 
 #	include <unordered_map>
 #	include <fstream>
+#	include <memory>
 #	include <iostream>
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
@@ -21,34 +22,46 @@ namespace webview_gui {
 namespace webview_gui {
 
 struct WebviewGui::Impl {
-	Impl(const choc::ui::WebView::Options &options) : main(main), webview(options) {}
-	
 	~Impl() {
 		using namespace choc::objc;
-		id subview = (id)webview.getViewHandle();
-		call<void>(subview, "removeFromSuperview");
+		if (webview) {
+			id subview = (id)webview->getViewHandle();
+			call<void>(subview, "removeFromSuperview");
+		}
+	}
+	
+	void init(const choc::ui::WebView::Options &options) {
+		webview = std::unique_ptr<choc::ui::WebView>{
+			new choc::ui::WebView(options);
+		};
 	}
 	
 	void attach(void *nativeView) {
+		if (!webview) return;
 		using namespace choc::objc;
 		id parent = (id)nativeView;
-		id subview = (id)webview.getViewHandle();
+		id subview = (id)webview->getViewHandle();
 		call<void>(parent, "addSubview:", subview);
 	}
 	void setSize(double width, double height) {
+		if (!webview) return;
 		using namespace choc::objc;
 		struct CGRect rect = {0, 0, CGFloat(width), CGFloat(height)};
-		id subview = (id)webview.getViewHandle();
+		id subview = (id)webview->getViewHandle();
 		call<void>(subview, "setFrame:", rect);
 	}
 
-	WebviewGui *main;
-	choc::ui::WebView webview;
+	WebviewGui *main = nullptr;
+	std::unique_ptr<choc::ui::WebView> webview;
 };
 #	else
 struct WebviewGui::Impl {
-	Impl(const choc::ui::WebView::Options &options) : main(main), webview(options) {}
-	
+	void init(const choc::ui::WebView::Options &options) {
+		webview = std::unique_ptr<choc::ui::WebView>{
+			new choc::ui::WebView(options);
+		};
+	}
+
 	void attach(void *parent) {
 		LOG_EXPR(parent);
 	}
@@ -57,7 +70,7 @@ struct WebviewGui::Impl {
 		LOG_EXPR(height);
 	}
 
-	WebviewGui *main;
+	WebviewGui *main = nullptr;
 	choc::ui::WebView webview;
 };
 #	endif
@@ -65,6 +78,8 @@ struct WebviewGui::Impl {
 WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &startPath, WebviewGui::ResourceGetter getter) {
 	if (!supports(p)) return nullptr;
 
+	auto *impl = new WebviewGui::Impl();
+	
 	choc::ui::WebView::Options options;
 	options.acceptsFirstMouseClick = true;
 	options.transparentBackground = true;
@@ -90,7 +105,7 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 		}
 		return chocResource;
 	};
-	options.webviewIsReady = [startUri](choc::ui::WebView &wv){
+	options.webviewIsReady = [startUri, impl](choc::ui::WebView &wv){
 		wv.addInitScript(R"jsCode(
 			if (!Uint8Array.prototype.toBase64) {
 				Uint8Array.prototype.toBase64 = function() {
@@ -121,24 +136,26 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 				window.dispatchEvent(new MessageEvent('message', {data: Uint8Array.fromBase64(b64).buffer}));
 			}
 		)jsCode");
+
+		wv.bind("_WebviewGui_receive64", [impl](const choc::value::ValueView& args){
+			auto *gui = impl->main;
+			if (gui && gui->receive && args.isArray() && args.size() == 1) {
+				auto base64 = args[0].getString();
+				std::vector<unsigned char> bytes;
+				choc::base64::decodeToContainer(bytes, base64);
+				gui->receive(bytes.data(), bytes.size());
+			}
+			return choc::value::Value{true};
+		});
+
 		wv.navigate(startUri);
 	};
 
-	auto *impl = new WebviewGui::Impl(options);
+	impl->init(options);
 	if (!impl->webview.loadedOK()) {
 		delete impl;
 		return nullptr;
 	}
-	impl->webview.bind("_WebviewGui_receive64", [impl](const choc::value::ValueView& args){
-		auto *gui = impl->main;
-		if (gui && gui->receive && args.isArray() && args.size() == 1) {
-			auto base64 = args[0].getString();
-			std::vector<unsigned char> bytes;
-			choc::base64::decodeToContainer(bytes, base64);
-			gui->receive(bytes.data(), bytes.size());
-		}
-		return choc::value::Value{true};
-	});
 
 	return new WebviewGui(impl);
 }
