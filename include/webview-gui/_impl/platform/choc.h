@@ -29,13 +29,13 @@ struct WebviewGui::Impl {
 			call<void>(subview, "removeFromSuperview");
 		}
 	}
-	
+
 	void init(const choc::ui::WebView::Options &options) {
 		webview = std::unique_ptr<choc::ui::WebView>{
 			new choc::ui::WebView(options)
 		};
 	}
-	
+
 	void attach(void *nativeView) {
 		if (!webview) return;
 		using namespace choc::objc;
@@ -64,8 +64,16 @@ struct WebviewGui::Impl {
 
 	void attach(void *parent) {
 		LOG_EXPR(parent);
+		auto* parentHandle = static_cast<::HWND>(parent);
+		auto* webviewHandle = static_cast<::HWND>(webview->getViewHandle());
+		::SetWindowPos(webviewHandle, NULL, 0, 0, 500, 500, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE | SWP_FRAMECHANGED);
+		::SetWindowLongPtrW(webviewHandle, GWL_STYLE, WS_CHILD);
+		::SetParent(webviewHandle, parentHandle);
+		::ShowWindow(webviewHandle, SW_SHOW);
 	}
 	void setSize(double width, double height) {
+		auto* hwnd = static_cast<::HWND>(webview->getViewHandle());
+		::SetWindowPos(hwnd, NULL, 0, 0, static_cast<int>(width), static_cast<int>(height), SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE | SWP_FRAMECHANGED);
 		LOG_EXPR(width);
 		LOG_EXPR(height);
 	}
@@ -79,13 +87,13 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 	if (!supports(p)) return nullptr;
 
 	auto *impl = new WebviewGui::Impl();
-	
+
 	choc::ui::WebView::Options options;
 	options.acceptsFirstMouseClick = true;
 	options.transparentBackground = true;
 #	if CHOC_WINDOWS
 	// Copied from CHOC - not sure why, maybe ensuring a secure context?
-	options.customSchemeURI = "https://choc.localhost/";
+	options.customSchemeURI = "https://choc.localhost";
 #	else
 	options.customSchemeURI = "choc://choc.choc/";
 #	endif
