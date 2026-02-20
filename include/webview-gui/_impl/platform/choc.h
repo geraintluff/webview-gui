@@ -152,7 +152,7 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 	};
 
 	impl->init(options);
-	if (!impl->webview.loadedOK()) {
+	if (!impl->webview->loadedOK()) {
 		delete impl;
 		return nullptr;
 	}
@@ -201,7 +201,7 @@ void WebviewGui::attach(void *platformNative) {
 }
 void WebviewGui::send(const unsigned char *bytes, size_t length) {
 	auto base64 = choc::base64::encodeToString(bytes, length);
-	impl->webview.evaluateJavascript("_WebviewGui_send64(\"" + base64 + "\");");
+	impl->webview->evaluateJavascript("_WebviewGui_send64(\"" + base64 + "\");");
 }
 void WebviewGui::setSize(double width, double height) {
 	impl->setSize(width, height);
