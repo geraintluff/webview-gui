@@ -32,7 +32,7 @@ struct WebviewGui::Impl {
 	
 	void init(const choc::ui::WebView::Options &options) {
 		webview = std::unique_ptr<choc::ui::WebView>{
-			new choc::ui::WebView(options);
+			new choc::ui::WebView(options)
 		};
 	}
 	
@@ -58,7 +58,7 @@ struct WebviewGui::Impl {
 struct WebviewGui::Impl {
 	void init(const choc::ui::WebView::Options &options) {
 		webview = std::unique_ptr<choc::ui::WebView>{
-			new choc::ui::WebView(options);
+			new choc::ui::WebView(options)
 		};
 	}
 
@@ -71,7 +71,7 @@ struct WebviewGui::Impl {
 	}
 
 	WebviewGui *main = nullptr;
-	choc::ui::WebView webview;
+	std::unique_ptr<choc::ui::WebView> webview;
 };
 #	endif
 
