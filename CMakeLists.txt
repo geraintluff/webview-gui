@@ -6,9 +6,6 @@ add_library(webview-gui
 target_include_directories(webview-gui PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-if(WIN32)
-    target_link_libraries(webview-gui PRIVATE choc)
-endif()
 
 # ---
 # Linking instructions as per CHOC (tests/CMakeLists.txt)
