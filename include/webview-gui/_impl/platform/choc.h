@@ -14,19 +14,27 @@
 #	include <iostream>
 #	define LOG_EXPR(expr) std::cout << #expr " = " << (expr) << std::endl;
 
-namespace webview_gui {
-
 #	if CHOC_APPLE
-} // close namespace
 #		include <CoreFoundation/CFBundle.h>
+#	elif CHOC_WINDOWS
+#		define WIN32_LEAN_AND_MEAN
+#		include <windows.h>
+#	endif
+
 namespace webview_gui {
 
 struct WebviewGui::Impl {
 	~Impl() {
-		using namespace choc::objc;
 		if (webview) {
+#	if CHOC_APPLE
+			using namespace choc::objc;
 			id subview = (id)webview->getViewHandle();
 			call<void>(subview, "removeFromSuperview");
+#	elif CHOC_WINDOWS
+			HWND handle = static_cast<HWND>(webview->getViewHandle());
+			::ShowWindow(handle, SW_SHOW);
+			::SetParent(handle, NULL);
+#	endif
 		}
 	}
 	
@@ -36,44 +44,36 @@ struct WebviewGui::Impl {
 		};
 	}
 	
-	void attach(void *nativeView) {
+	void attach(void *parentView) {
 		if (!webview) return;
+#	if CHOC_APPLE
 		using namespace choc::objc;
-		id parent = (id)nativeView;
-		id subview = (id)webview->getViewHandle();
+		id parent = static_cast<id>(parentView);
+		id subview = static_cast<id>(webview->getViewHandle());
 		call<void>(parent, "addSubview:", subview);
+#	elif CHOC_WINDOWS
+		HWND handle = static_cast<HWND>(webview->getViewHandle());
+		::SetParent(handle, static_cast<HWND>(parentView));
+		::ShowWindow(handle, SW_SHOW);
+		::UpdateWindow(static_cast<HWND>(parentView));
+#	endif
 	}
 	void setSize(double width, double height) {
 		if (!webview) return;
+#	if CHOC_APPLE
 		using namespace choc::objc;
 		struct CGRect rect = {0, 0, CGFloat(width), CGFloat(height)};
 		id subview = (id)webview->getViewHandle();
 		call<void>(subview, "setFrame:", rect);
-	}
-
-	WebviewGui *main = nullptr;
-	std::unique_ptr<choc::ui::WebView> webview;
-};
-#	else
-struct WebviewGui::Impl {
-	void init(const choc::ui::WebView::Options &options) {
-		webview = std::unique_ptr<choc::ui::WebView>{
-			new choc::ui::WebView(options)
-		};
-	}
-
-	void attach(void *parent) {
-		LOG_EXPR(parent);
-	}
-	void setSize(double width, double height) {
-		LOG_EXPR(width);
-		LOG_EXPR(height);
-	}
-
-	WebviewGui *main = nullptr;
-	std::unique_ptr<choc::ui::WebView> webview;
-};
+#	elif CHOC_WINDOWS
+		HWND handle = static_cast<HWND>(webview->getViewHandle());
+		::MoveWindow(handle, 0, 0, int(std::round(width)), int(std::round(height)), TRUE);
 #	endif
+	}
+
+	WebviewGui *main = nullptr;
+	std::unique_ptr<choc::ui::WebView> webview;
+};
 
 WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &startPath, WebviewGui::ResourceGetter getter) {
 	if (!supports(p)) return nullptr;
@@ -193,8 +193,8 @@ WebviewGui::~WebviewGui() {
 	delete impl;
 }
 
-bool WebviewGui::supports(WebviewGui::Platform p) {
-	return (p != NONE);
+bool WebviewGui::supports(Platform p) {
+	return (p != Platform::NONE);
 }
 void WebviewGui::attach(void *platformNative) {
 	impl->attach(platformNative);

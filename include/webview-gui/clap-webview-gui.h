@@ -285,10 +285,10 @@ private:
 	}
 	
 	static WebviewGui::Platform clapApiToPlatform(const char *api) {
-		auto platform = WebviewGui::NONE;
-		if (!std::strcmp(api, CLAP_WINDOW_API_WIN32)) platform = WebviewGui::HWND;
-		if (!std::strcmp(api, CLAP_WINDOW_API_COCOA)) platform = WebviewGui::COCOA;
-		if (!std::strcmp(api, CLAP_WINDOW_API_X11)) platform = WebviewGui::X11EMBED;
+		auto platform = WebviewGui::P_NONE;
+		if (!std::strcmp(api, CLAP_WINDOW_API_WIN32)) platform = WebviewGui::P_HWND;
+		if (!std::strcmp(api, CLAP_WINDOW_API_COCOA)) platform = WebviewGui::P_COCOA;
+		if (!std::strcmp(api, CLAP_WINDOW_API_X11)) platform = WebviewGui::P_X11EMBED;
 		return platform;
 	}
 

@@ -17,10 +17,10 @@ struct WebviewGui {
 	enum class Platform {
 		NONE, HWND, COCOA, X11EMBED
 	};
-	static constexpr Platform NONE = Platform::NONE;
-	static constexpr Platform HWND = Platform::HWND;
-	static constexpr Platform COCOA = Platform::COCOA;
-	static constexpr Platform X11EMBED = Platform::X11EMBED;
+	static constexpr Platform P_NONE = Platform::NONE;
+	static constexpr Platform P_HWND = Platform::HWND;
+	static constexpr Platform P_COCOA = Platform::COCOA;
+	static constexpr Platform P_X11EMBED = Platform::X11EMBED;
 	
 	struct Resource {
 		std::string mediaType;
