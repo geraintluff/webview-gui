@@ -85,7 +85,7 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 	options.transparentBackground = true;
 #	if CHOC_WINDOWS
 	// Copied from CHOC - not sure why, maybe ensuring a secure context?
-	options.customSchemeURI = "https://choc.localhost/";
+	options.customSchemeURI = "https://choc.localhost";
 #	else
 	options.customSchemeURI = "choc://choc.choc/";
 #	endif
@@ -94,7 +94,9 @@ WebviewGui * WebviewGui::create(WebviewGui::Platform p, const std::string &start
 		using ChocResource = choc::ui::WebView::Options::Resource;
 		std::optional<ChocResource> chocResource;
 		Resource resource;
-		if (getter(path.c_str(), resource)) {
+		const char *cPath = path.c_str();
+		if (cPath[0] == '/' && cPath[1] == '/') ++cPath;
+		if (getter(cPath, resource)) {
 			chocResource.emplace();
 			chocResource->data = std::move(resource.bytes);
 			if (resource.mediaType.size()) {
