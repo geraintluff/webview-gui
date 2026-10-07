@@ -67,7 +67,8 @@ struct WebviewGui::Impl {
 		call<void>(subview, "setFrame:", rect);
 #	elif CHOC_WINDOWS
 		HWND handle = static_cast<HWND>(webview->getViewHandle());
-		::MoveWindow(handle, 0, 0, int(std::round(width)), int(std::round(height)), TRUE);
+		auto scale = float(::GetDpiForWindow(handle))/USER_DEFAULT_SCREEN_DPI;
+		::MoveWindow(handle, 0, 0, int(std::round(width*scale)), int(std::round(height*scale)), TRUE);
 #	endif
 	}
 
